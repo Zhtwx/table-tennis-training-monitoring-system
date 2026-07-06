@@ -1,0 +1,18 @@
+.venv/
+venv/
+env/
+__pycache__/
+.agents/
+.codex/
+.codex_tmp/
+ .codex_tmp/
+*.py[cod]
+.env
+.flaskenv
+instance/
+uploads/
+*.db
+*.sqlite
+*.sqlite3
+.DS_Store
+Thumbs.db

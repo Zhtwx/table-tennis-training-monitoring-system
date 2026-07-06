@@ -1,0 +1,149 @@
+{% extends "base.html" %}
+
+{% block title %}综合看板 - 乒乓球运动员综合训练监控管理系统{% endblock %}
+
+{% block content %}
+<div class="d-flex flex-column flex-md-row align-items-md-center justify-content-between gap-3 mb-4">
+    <div>
+        <h1 class="page-title h3 mb-1">综合训练看板</h1>
+        <p class="text-secondary mb-0">集中呈现队伍训练负荷、伤病风险、出勤表现与近期趋势。</p>
+    </div>
+    <div class="text-secondary small">数据更新时间：2026-07-06 12:00</div>
+</div>
+
+<div class="row g-3 mb-4">
+    <div class="col-6 col-xl-3">
+        <div class="card shadow-sm stat-card h-100">
+            <div class="card-body">
+                <div class="text-secondary small">在训运动员</div>
+                <div class="fs-3 fw-bold">28</div>
+            </div>
+        </div>
+    </div>
+    <div class="col-6 col-xl-3">
+        <div class="card shadow-sm stat-card h-100">
+            <div class="card-body">
+                <div class="text-secondary small">本月训练时长</div>
+                <div class="fs-3 fw-bold">1,260h</div>
+            </div>
+        </div>
+    </div>
+    <div class="col-6 col-xl-3">
+        <div class="card shadow-sm stat-card h-100">
+            <div class="card-body">
+                <div class="text-secondary small">重点伤病关注</div>
+                <div class="fs-3 fw-bold text-danger">6</div>
+            </div>
+        </div>
+    </div>
+    <div class="col-6 col-xl-3">
+        <div class="card shadow-sm stat-card h-100">
+            <div class="card-body">
+                <div class="text-secondary small">训练出勤率</div>
+                <div class="fs-3 fw-bold text-success">96%</div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<div class="row g-4">
+    <div class="col-12 col-xl-6">
+        <div class="card shadow-sm h-100">
+            <div class="card-header bg-white border-0 pt-4 px-4">
+                <h2 class="h5 mb-1">全队伤病分布</h2>
+                <p class="text-secondary small mb-0">按伤病部位统计当前队伍健康风险结构。</p>
+            </div>
+            <div class="card-body">
+                <div id="injuryPieChart" class="chart-box"></div>
+            </div>
+        </div>
+    </div>
+
+    <div class="col-12 col-xl-6">
+        <div class="card shadow-sm h-100">
+            <div class="card-header bg-white border-0 pt-4 px-4">
+                <h2 class="h5 mb-1">月度训练时长趋势</h2>
+                <p class="text-secondary small mb-0">展示近 6 个月训练总时长变化。</p>
+            </div>
+            <div class="card-body">
+                <div id="trainingLineChart" class="chart-box"></div>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+    document.addEventListener('DOMContentLoaded', function () {
+        const injuryChart = echarts.init(document.getElementById('injuryPieChart'));
+        const trainingChart = echarts.init(document.getElementById('trainingLineChart'));
+
+        injuryChart.setOption({
+            tooltip: {
+                trigger: 'item',
+                formatter: '{b}<br/>人数：{c}人<br/>占比：{d}%'
+            },
+            legend: {
+                bottom: 0,
+                left: 'center'
+            },
+            series: [{
+                name: '伤病分布',
+                type: 'pie',
+                radius: ['42%', '68%'],
+                center: ['50%', '45%'],
+                itemStyle: {
+                    borderRadius: 6,
+                    borderColor: '#fff',
+                    borderWidth: 2
+                },
+                data: [
+                    { value: 3, name: '肩部' },
+                    { value: 2, name: '腰部' },
+                    { value: 4, name: '膝部' },
+                    { value: 2, name: '踝部' },
+                    { value: 1, name: '手腕' }
+                ]
+            }]
+        });
+
+        trainingChart.setOption({
+            color: ['#1769aa'],
+            tooltip: {
+                trigger: 'axis'
+            },
+            grid: {
+                left: 40,
+                right: 24,
+                top: 32,
+                bottom: 48
+            },
+            xAxis: {
+                type: 'category',
+                boundaryGap: false,
+                data: ['1月', '2月', '3月', '4月', '5月', '6月']
+            },
+            yAxis: {
+                type: 'value',
+                name: '小时'
+            },
+            series: [{
+                name: '训练时长',
+                type: 'line',
+                smooth: true,
+                symbolSize: 8,
+                areaStyle: {
+                    opacity: 0.12
+                },
+                data: [168, 192, 214, 238, 226, 252]
+            }]
+        });
+
+        window.addEventListener('resize', function () {
+            injuryChart.resize();
+            trainingChart.resize();
+        });
+    });
+</script>
+{% endblock %}
