@@ -1,3 +1,7 @@
+import io
+import openpyxl
+from flask import send_file
+from openpyxl.styles import Font, Alignment
 from copy import deepcopy
 from datetime import datetime
 from functools import wraps
@@ -112,7 +116,7 @@ TRAINING_PLANS = [
         "athlete_name": "王一鸣",
         "coach_id": 1,
         "coach_name": "张教练",
-        "plan_date": "2026-07-01",
+        "plan_datetime": "2026-07-01 09:00",
         "content": "正手攻球+反手推挡",
         "intensity": "高",
         "duration": 90,
@@ -124,7 +128,7 @@ TRAINING_PLANS = [
         "athlete_name": "李清扬",
         "coach_id": 2,
         "coach_name": "李教练",
-        "plan_date": "2026-07-02",
+        "plan_datetime": "2026-07-02 10:00",
         "content": "发球抢攻战术",
         "intensity": "中",
         "duration": 75,
@@ -133,17 +137,13 @@ TRAINING_PLANS = [
 ]
 PLAN_ID_COUNTER = 3
 
-COACHES = [
-    {"id": 1, "name": "陈指导", "specialty": "技术训练"},
-    {"id": 2, "name": "刘指导", "specialty": "体能训练"},
-    {"id": 3, "name": "马指导", "specialty": "战术分析"},
-]
+
 
 FITNESS_TESTS = [
     {
         "id": 1,
         "athlete_id": 1,
-        "test_date": "2026-06-03",
+        "test_date": "2026-06-03 9:30",
         "tester_id": 2,
         "upper_strength": 84.0,
         "lower_strength": 88.0,
@@ -157,7 +157,7 @@ FITNESS_TESTS = [
     {
         "id": 2,
         "athlete_id": 2,
-        "test_date": "2026-06-11",
+        "test_date": "2026-06-11 14:00",
         "tester_id": 2,
         "upper_strength": 76.0,
         "lower_strength": 78.0,
@@ -171,7 +171,7 @@ FITNESS_TESTS = [
     {
         "id": 3,
         "athlete_id": 3,
-        "test_date": "2026-06-18",
+        "test_date": "2026-06-18 10:00",
         "tester_id": 2,
         "upper_strength": 82.0,
         "lower_strength": 84.0,
@@ -185,7 +185,7 @@ FITNESS_TESTS = [
     {
         "id": 4,
         "athlete_id": 4,
-        "test_date": "2026-07-02",
+        "test_date": "2026-07-02 15:00",
         "tester_id": 2,
         "upper_strength": 70.0,
         "lower_strength": 66.0,
@@ -204,7 +204,7 @@ TRAINING_SYNC_LOGS = [
         "fitness_test_id": 1,
         "athlete_id": 1,
         "coach_id": 2,
-        "sync_date": "2026-06-03",
+        "sync_date": "2026-06-03 ",
         "plan_name": "体能巩固训练",
         "hours": 16.0,
         "intensity": "中",
@@ -399,15 +399,19 @@ def create_app():
         if request.method == "POST":
             athlete_id = request.form.get("athlete_id")
             coach_id = request.form.get("coach_id")
-            plan_date = request.form.get("plan_date")
+            plan_datetime = request.form.get("plan_datetime")
             content = request.form.get("content")
             intensity = request.form.get("intensity")
             duration = request.form.get("duration")
             location = request.form.get("location")
 
-            if not all([athlete_id, coach_id, plan_date, content]):
-                flash("请填写完整信息（运动员、教练、日期、内容为必填）", "warning")
-                return redirect(url_for("training.plans"))
+            # 🔽 调用校验函数
+            errors = validate_training_plan_data(athlete_id, coach_id, plan_datetime, content, intensity, duration)
+            
+            if errors:
+                for err in errors:
+                    flash(err, "danger")
+                return redirect(url_for("training.plans"))   # 直接重定向回列表页
 
             athlete = next((p for p in PLAYERS if str(p["id"]) == athlete_id), None)
             coach = next((c for c in COACHES if str(c["id"]) == coach_id), None)
@@ -417,17 +421,17 @@ def create_app():
 
             global PLAN_ID_COUNTER
             new_plan = {
-                "id": PLAN_ID_COUNTER,
-                "athlete_id": int(athlete_id),
-                "athlete_name": athlete["name"],
-                "coach_id": int(coach_id),
-                "coach_name": coach["name"],
-                "plan_date": plan_date,
-                "content": content,
-                "intensity": intensity,
-                "duration": int(duration) if duration else 60,
-                "location": location or "",
-            }
+                        "id": PLAN_ID_COUNTER,
+                        "athlete_id": int(athlete_id),
+                        "athlete_name": athlete["name"],
+                        "coach_id": int(coach_id),
+                        "coach_name": coach["name"],
+                        "plan_datetime": plan_datetime,
+                        "content": content,
+                        "intensity": intensity,
+                        "duration": int(duration) if duration else 60,
+                        "location": location or "",
+                    }
             TRAINING_PLANS.append(new_plan)
             PLAN_ID_COUNTER += 1
             flash("训练计划添加成功", "success")
@@ -443,13 +447,13 @@ def create_app():
         if athlete_name:
             filtered = [p for p in filtered if athlete_name.lower() in p["athlete_name"].lower()]
         if start_date:
-            filtered = [p for p in filtered if p["plan_date"] >= start_date]
+            filtered = [p for p in filtered if p["plan_datetime"] >= start_date]
         if end_date:
-            filtered = [p for p in filtered if p["plan_date"] <= end_date]
+            filtered = [p for p in filtered if p["plan_datetime"] <= end_date]
         if content_keyword:
             filtered = [p for p in filtered if content_keyword.lower() in p["content"].lower()]
 
-        filtered.sort(key=lambda x: x["plan_date"], reverse=True)
+        filtered.sort(key=lambda x: x["plan_datetime"], reverse=True)
 
         return render_template(
             "training/plans.html",
@@ -474,28 +478,33 @@ def create_app():
         if request.method == "POST":
             athlete_id = request.form.get("athlete_id")
             coach_id = request.form.get("coach_id")
-            plan_date = request.form.get("plan_date")
+            plan_datetime = request.form.get("plan_datetime")
             content = request.form.get("content")
             intensity = request.form.get("intensity")
             duration = request.form.get("duration")
             location = request.form.get("location")
 
-            if not all([athlete_id, coach_id, plan_date, content]):
-                flash("请填写完整信息", "warning")
+            # 🔽 调用统一的校验函数
+            errors = validate_training_plan_data(athlete_id, coach_id, plan_datetime, content, intensity, duration)
+            if errors:
+                for err in errors:
+                    flash(err, "danger")
                 return render_template("training/plan_form.html", plan=plan, athletes=PLAYERS, coaches=COACHES)
 
+            # 查找运动员和教练（保留原有逻辑）
             athlete = next((p for p in PLAYERS if str(p["id"]) == athlete_id), None)
             coach = next((c for c in COACHES if str(c["id"]) == coach_id), None)
             if not athlete or not coach:
                 flash("运动员或教练不存在", "danger")
                 return render_template("training/plan_form.html", plan=plan, athletes=PLAYERS, coaches=COACHES)
 
+            # 更新计划（保留原有逻辑）
             plan.update({
                 "athlete_id": int(athlete_id),
                 "athlete_name": athlete["name"],
                 "coach_id": int(coach_id),
                 "coach_name": coach["name"],
-                "plan_date": plan_date,
+                "plan_datetime": plan_datetime,
                 "content": content,
                 "intensity": intensity,
                 "duration": int(duration) if duration else 60,
@@ -529,10 +538,119 @@ def create_app():
         file = request.files.get("training_excel")
         if not file:
             flash("请先选择 Excel 文件。", "warning")
-        else:
-            flash(f"已收到文件：{file.filename}，系统将执行数据校验。", "success")
-        return redirect(url_for("training.batch_import"))
+            return redirect(url_for("training.batch_import"))
 
+        from datetime import datetime, timedelta
+        error_rows = []
+        imported_count = 0
+        global PLAN_ID_COUNTER
+
+        try:
+            wb = openpyxl.load_workbook(file)
+            ws = wb.active
+
+            for idx, row in enumerate(ws.iter_rows(min_row=2, values_only=True), start=2):
+                athlete_name, coach_name, plan_datetime, content, intensity, duration, location = row[:7]
+                
+                if not athlete_name and not content:
+                    continue
+
+                row_errors = []
+                
+                athlete = next((p for p in PLAYERS if p["name"] == athlete_name), None)
+                coach = next((c for c in COACHES if c["name"] == coach_name), None)
+                if not athlete:
+                    row_errors.append(f"第{idx}行：找不到运动员 '{athlete_name}'")
+                if not coach:
+                    row_errors.append(f"第{idx}行：找不到教练 '{coach_name}'")
+                
+                plan_datetime_str = None
+                try:
+                    if isinstance(plan_datetime, datetime):
+                        plan_datetime_str = plan_datetime.strftime("%Y-%m-%d")
+                    elif isinstance(plan_datetime, int):
+                        plan_datetime_str = (datetime(1899, 12, 30) + timedelta(days=plan_datetime)).strftime("%Y-%m-%d")
+                    else:
+                        datetime.strptime(str(plan_datetime), "%Y-%m-%d")
+                        plan_datetime_str = str(plan_datetime)
+                except:
+                    row_errors.append(f"第{idx}行：日期格式错误")
+
+                valid_intensities = ["低", "中", "高", "极高"]
+                if intensity and intensity not in valid_intensities:
+                    row_errors.append(f"第{idx}行：强度 '{intensity}' 非法")
+
+                try:
+                    dur = int(duration) if duration else 60
+                    if dur <= 0 or dur > 600:
+                        row_errors.append(f"第{idx}行：时长必须为 1~600 分钟")
+                except:
+                    row_errors.append(f"第{idx}行：时长必须为数字")
+
+                if row_errors:
+                    error_rows.extend(row_errors)
+                    continue
+
+                new_plan = {
+                    "id": PLAN_ID_COUNTER,
+                    "athlete_id": athlete["id"],
+                    "athlete_name": athlete["name"],
+                    "coach_id": coach["id"],
+                    "coach_name": coach["name"],
+                    "plan_datetime": plan_datetime_str,
+                    "content": content,
+                    "intensity": intensity if intensity in valid_intensities else "中",
+                    "duration": int(duration) if duration else 60,
+                    "location": location or "",
+                }
+                TRAINING_PLANS.append(new_plan)
+                PLAN_ID_COUNTER += 1
+                imported_count += 1
+
+            if error_rows:
+                flash(f"⚠️ 成功导入 {imported_count} 条，{len(error_rows)} 个错误已跳过：", "warning")
+                for err in error_rows[:5]:
+                    flash(f"  • {err}", "warning")
+            else:
+                flash(f"✅ 成功导入 {imported_count} 条训练计划！", "success")
+
+        except Exception as e:
+            flash(f"❌ Excel 解析失败：{str(e)}", "danger")
+
+        return redirect(url_for("training.batch_import"))
+    @training_bp.route("/plans/export", methods=["GET"])
+    @role_required("admin", "coach")
+    def export_plans():
+        """导出当前训练计划列表为 Excel"""
+        wb = openpyxl.Workbook()
+        ws = wb.active
+        ws.title = "训练计划"
+
+        headers = ["运动员", "教练", "训练日期", "内容", "强度", "时长(分钟)", "地点"]
+        for col, header in enumerate(headers, 1):
+            cell = ws.cell(row=1, column=col, value=header)
+            cell.font = Font(bold=True)
+            cell.alignment = Alignment(horizontal="center")
+
+        for row_idx, plan in enumerate(TRAINING_PLANS, 2):
+            ws.cell(row=row_idx, column=1, value=plan["athlete_name"])
+            ws.cell(row=row_idx, column=2, value=plan["coach_name"])
+            ws.cell(row=row_idx, column=3, value=plan["plan_datetime"])
+            ws.cell(row=row_idx, column=4, value=plan["content"])
+            ws.cell(row=row_idx, column=5, value=plan["intensity"])
+            ws.cell(row=row_idx, column=6, value=plan["duration"])
+            ws.cell(row=row_idx, column=7, value=plan.get("location", ""))
+
+        output = io.BytesIO()
+        wb.save(output)
+        output.seek(0)
+
+        return send_file(
+            output,
+            as_attachment=True,
+            download_name="训练计划列表.xlsx",
+            mimetype="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
+        )
     injuries_bp = Blueprint("injuries", __name__, url_prefix="/injuries")
 
     @injuries_bp.route("/", endpoint="list")
@@ -667,7 +785,53 @@ def filter_players(args):
 class ValidationError(Exception):
     pass
 
+def validate_training_plan_data(athlete_id, coach_id, plan_datetime, content, intensity, duration):
+    """校验训练计划数据，返回错误列表"""
+    errors = []
+    
+    if not all([athlete_id, coach_id, plan_datetime, content]):
+        errors.append("请填写完整信息（运动员、教练、日期、内容为必填）")
+        return errors
 
+    athlete = next((p for p in PLAYERS if str(p["id"]) == athlete_id), None)
+    coach = next((c for c in COACHES if str(c["id"]) == coach_id), None)
+    if not athlete:
+        errors.append("所选运动员不存在，请重新选择")
+    if not coach:
+        errors.append("所选教练不存在，请重新选择")
+    if not athlete or not coach:
+        return errors
+
+    from datetime import datetime
+    try:
+        # 提取日期部分（前10位）
+        date_part = plan_datetime[:10] if plan_datetime else ""
+        if not date_part:
+            errors.append("日期格式错误")
+        else:
+            selected_date = datetime.strptime(date_part, "%Y-%m-%d")
+            if selected_date < datetime.now():
+                errors.append("训练日期不能早于今天")
+    except ValueError:
+        errors.append("日期格式错误，请使用 YYYY-MM-DD 格式")
+
+    valid_intensities = ["低", "中", "高", "极高"]
+    if intensity not in valid_intensities:
+        errors.append("训练强度必须为：低、中、高、极高")
+
+    try:
+        duration_int = int(duration) if duration else 60
+        if duration_int <= 0:
+            errors.append("训练时长必须大于 0 分钟")
+        elif duration_int > 600:
+            errors.append("训练时长不能超过 600 分钟（10小时）")
+    except (ValueError, TypeError):
+        errors.append("训练时长必须为有效的数字")
+
+    if len(content) > 500:
+        errors.append("训练内容不能超过 500 个字符")
+
+    return errors
 def filter_fitness_tests(args):
     predicates = []
     player_keyword = args.get("player_keyword", "").strip().lower()

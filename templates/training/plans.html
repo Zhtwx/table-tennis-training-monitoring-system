@@ -8,9 +8,14 @@
         <h1 class="page-title h3 mb-1">训练计划管理</h1>
         <p class="text-secondary mb-0">发布、编辑、删除训练计划，支持按运动员姓名、日期范围、内容关键词查询。</p>
     </div>
-    <button class="btn btn-primary" data-bs-toggle="modal" data-bs-target="#planModal" onclick="resetForm()">
-        + 新增计划
-    </button>
+    <div class="d-flex gap-2">
+        <button class="btn btn-success" data-bs-toggle="modal" data-bs-target="#importModal">
+            📥 导入 Excel
+        </button>
+        <button class="btn btn-primary" data-bs-toggle="modal" data-bs-target="#planModal" onclick="resetForm()">
+            + 新增计划
+        </button>
+    </div>
 </div>
 
 <!-- 查询表单 -->
@@ -26,11 +31,11 @@
                        value="{{ athlete_name }}" placeholder="如：王一鸣">
             </div>
             <div class="col-12 col-md-3">
-                <label for="start_date" class="form-label">起始日期</label>
+                <label for="start_date" class="form-label">起始日期（仅日期）</label>
                 <input type="date" class="form-control" id="start_date" name="start_date" value="{{ start_date }}">
             </div>
             <div class="col-12 col-md-3">
-                <label for="end_date" class="form-label">结束日期</label>
+                <label for="end_date" class="form-label">结束日期（仅日期）</label>
                 <input type="date" class="form-control" id="end_date" name="end_date" value="{{ end_date }}">
             </div>
             <div class="col-12 col-md-3">
@@ -47,9 +52,14 @@
 
 <!-- 计划列表 -->
 <div class="card shadow-sm">
-    <div class="card-header bg-white border-0 pt-4 px-4">
-        <h2 class="h5 mb-1">计划列表</h2>
-        <p class="text-secondary small mb-0">共 {{ plans|length }} 条计划</p>
+    <div class="card-header bg-white border-0 pt-4 px-4 d-flex justify-content-between align-items-center">
+        <div>
+            <h2 class="h5 mb-1">计划列表</h2>
+            <p class="text-secondary small mb-0">共 {{ plans|length }} 条计划</p>
+        </div>
+        <a href="{{ url_for('training.export_plans') }}" class="btn btn-success btn-sm">
+            📥 导出 Excel
+        </a>
     </div>
     <div class="card-body">
         <div class="table-responsive">
@@ -59,7 +69,7 @@
                         <th>ID</th>
                         <th>运动员</th>
                         <th>教练</th>
-                        <th>日期</th>
+                        <th>计划时间</th>
                         <th>内容</th>
                         <th>强度</th>
                         <th>时长(分)</th>
@@ -73,7 +83,7 @@
                         <td>{{ plan.id }}</td>
                         <td>{{ plan.athlete_name }}</td>
                         <td>{{ plan.coach_name }}</td>
-                        <td>{{ plan.plan_date }}</td>
+                        <td>{{ plan.plan_datetime }}</td>
                         <td>{{ plan.content }}</td>
                         <td>
                             <span class="badge 
@@ -104,7 +114,7 @@
     </div>
 </div>
 
-<!-- 新增模态框（使用与编辑相似的字段，但编辑用独立页面，这里只做新增） -->
+<!-- 新增模态框 -->
 <div class="modal fade" id="planModal" tabindex="-1" aria-labelledby="planModalLabel" aria-hidden="true">
     <div class="modal-dialog modal-dialog-centered modal-lg">
         <div class="modal-content">
@@ -126,16 +136,17 @@
                         </div>
                         <div class="col-md-6">
                             <label for="coach_id" class="form-label">教练</label>
-                            <select class="form-select" id="coach_id" name="coach_id" required>
+                            <select class="form-select" id="coach_id" name="coach_id">
                                 <option value="">请选择</option>
                                 {% for coach in coaches %}
                                 <option value="{{ coach.id }}">{{ coach.name }}</option>
                                 {% endfor %}
                             </select>
+                            <small class="text-muted">可选</small>
                         </div>
                         <div class="col-md-6">
-                            <label for="plan_date" class="form-label">训练日期</label>
-                            <input type="date" class="form-control" id="plan_date" name="plan_date" required>
+                            <label for="plan_datetime" class="form-label">计划时间（精确到分钟）</label>
+                            <input type="datetime-local" class="form-control" id="plan_datetime" name="plan_datetime" required>
                         </div>
                         <div class="col-md-6">
                             <label for="intensity" class="form-label">强度</label>
@@ -169,10 +180,59 @@
     </div>
 </div>
 
+<!-- 导入 Excel 模态框 -->
+<div class="modal fade" id="importModal" tabindex="-1" aria-labelledby="importModalLabel" aria-hidden="true">
+    <div class="modal-dialog modal-dialog-centered">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h2 class="modal-title fs-5" id="importModalLabel">导入训练计划（Excel）</h2>
+                <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="关闭"></button>
+            </div>
+            <form method="post" action="{{ url_for('training.import_excel') }}" enctype="multipart/form-data">
+                <div class="modal-body">
+                    <div class="mb-3">
+                        <label for="training_excel" class="form-label">选择 Excel 文件（.xlsx 或 .xls）</label>
+                        <input class="form-control" type="file" id="training_excel" name="training_excel" accept=".xls,.xlsx" required>
+                        <div class="form-text">
+                            表头必须包含：运动员、教练、计划时间、内容、强度、时长(分钟)、地点<br>
+                            计划时间格式：<code>YYYY-MM-DD HH:MM</code>（例如 2026-07-18 14:30）
+                        </div>
+                    </div>
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">取消</button>
+                    <button type="submit" class="btn btn-success">上传并导入</button>
+                </div>
+            </form>
+        </div>
+    </div>
+</div>
+
+{% endblock %}
+
+{% block scripts %}
+<script src="https://cdn.jsdelivr.net/npm/sweetalert2@11"></script>
 <script>
+    
+    // 处理服务器返回的 flash 错误（转为弹窗）
+    window.addEventListener('load', function() {
+        const flashMessages = document.querySelectorAll('.alert-danger');
+        flashMessages.forEach(function(alert) {
+            const msg = alert.innerText.trim();
+            if (msg) {
+                Swal.fire({
+                    icon: 'error',
+                    title: '提交失败',
+                    text: msg,
+                    confirmButtonColor: '#1769aa'
+                });
+                alert.remove();
+            }
+        });
+    });
+
     function resetForm() {
-        // 模态框打开时重置表单（但注意模态框中的表单是独立的，可以简单重置）
-        // 无需额外操作，因为表单不会自动填充旧值
+        // 重置新增表单（由模态框自动处理）
     }
 </script>
 {% endblock %}
