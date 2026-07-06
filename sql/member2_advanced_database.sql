@@ -65,9 +65,9 @@ SELECT
     COUNT(DISTINCT fr.id) AS fitness_report_count,
     ROUND(AVG(fr.overall_score), 2) AS avg_fitness_score,
     COUNT(DISTINCT ir.id) AS injury_record_count,
-    SUM(CASE WHEN ir.recovery_status IN ('治疗中','康复中') THEN 1 ELSE 0 END) AS active_injury_count,
+    COUNT(DISTINCT CASE WHEN ir.recovery_status IN ('治疗中','康复中') THEN ir.id END) AS active_injury_count,
     COUNT(DISTINCT mr.id) AS match_count,
-    SUM(CASE WHEN mr.result = '胜' THEN 1 ELSE 0 END) AS win_count
+    COUNT(DISTINCT CASE WHEN mr.result = '胜' THEN mr.id END) AS win_count
 FROM athlete a
 LEFT JOIN training_plan tp ON tp.athlete_id = a.id
 LEFT JOIN technical_record tr ON tr.athlete_id = a.id
