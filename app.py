@@ -52,6 +52,7 @@ PLAYERS = [
         "gender": "男",
         "age": 19,
         "level": "一级运动员",
+        "skill_level": "一级运动员",
         "level_code": "first",
         "play_style": "右手横板快攻结合弧圈",
         "injury_status": "健康",
@@ -64,6 +65,7 @@ PLAYERS = [
         "gender": "女",
         "age": 18,
         "level": "二级运动员",
+        "skill_level": "二级运动员",
         "level_code": "second",
         "play_style": "左手横板两面弧圈",
         "injury_status": "观察中",
@@ -76,6 +78,7 @@ PLAYERS = [
         "gender": "男",
         "age": 21,
         "level": "国家级",
+        "skill_level": "国家级",
         "level_code": "national",
         "play_style": "右手直板近台快攻",
         "injury_status": "康复中",
@@ -88,6 +91,7 @@ PLAYERS = [
         "gender": "女",
         "age": 20,
         "level": "一级运动员",
+        "skill_level": "一级运动员",
         "level_code": "first",
         "play_style": "右手横板反手快拨",
         "injury_status": "伤病中",
@@ -95,61 +99,67 @@ PLAYERS = [
     },
 ]
 
+COACHES = [
+    {"id": 1, "name": "陈指导", "specialty": "技术训练"},
+    {"id": 2, "name": "刘指导", "specialty": "体能训练"},
+    {"id": 3, "name": "马指导", "specialty": "战术分析"},
+]
+
 FITNESS_TESTS = [
     {
         "id": 1,
-        "player_id": 1,
+        "athlete_id": 1,
         "test_date": "2026-06-03",
-        "lower_limb_strength": 186.0,
-        "mobility": 84.0,
-        "vertical_jump": 61.0,
-        "reaction_time": 0.31,
-        "training_duration": 95,
-        "training_intensity": "medium",
-        "training_intensity_label": "中",
-        "notes": "训练状态稳定，起跳爆发力保持良好。",
+        "tester_id": 2,
+        "upper_strength": 84.0,
+        "lower_strength": 88.0,
+        "flexibility": 82.0,
+        "endurance": 86.0,
+        "speed": 91.0,
+        "overall_score": 86.2,
+        "notes": "训练状态稳定，体能结构均衡。",
         "created_by": "coach",
     },
     {
         "id": 2,
-        "player_id": 2,
+        "athlete_id": 2,
         "test_date": "2026-06-11",
-        "lower_limb_strength": 158.0,
-        "mobility": 76.0,
-        "vertical_jump": 52.0,
-        "reaction_time": 0.35,
-        "training_duration": 88,
-        "training_intensity": "medium",
-        "training_intensity_label": "中",
-        "notes": "反应速度略有下降，建议控制多球训练总量。",
+        "tester_id": 2,
+        "upper_strength": 76.0,
+        "lower_strength": 78.0,
+        "flexibility": 74.0,
+        "endurance": 79.0,
+        "speed": 73.0,
+        "overall_score": 76.0,
+        "notes": "速度指标偏低，建议增加敏捷与启动练习。",
         "created_by": "coach",
     },
     {
         "id": 3,
-        "player_id": 3,
+        "athlete_id": 3,
         "test_date": "2026-06-18",
-        "lower_limb_strength": 172.0,
-        "mobility": 68.0,
-        "vertical_jump": 48.0,
-        "reaction_time": 0.4,
-        "training_duration": 105,
-        "training_intensity": "high",
-        "training_intensity_label": "高",
-        "notes": "关节活动度偏低，安排恢复性训练。",
+        "tester_id": 2,
+        "upper_strength": 82.0,
+        "lower_strength": 84.0,
+        "flexibility": 68.0,
+        "endurance": 81.0,
+        "speed": 76.0,
+        "overall_score": 78.2,
+        "notes": "柔韧性偏低，需加强拉伸和恢复。",
         "created_by": "admin",
     },
     {
         "id": 4,
-        "player_id": 4,
+        "athlete_id": 4,
         "test_date": "2026-07-02",
-        "lower_limb_strength": 136.0,
-        "mobility": 59.0,
-        "vertical_jump": 43.0,
-        "reaction_time": 0.45,
-        "training_duration": 72,
-        "training_intensity": "low",
-        "training_intensity_label": "低",
-        "notes": "伤病恢复阶段，采用低强度过渡方案。",
+        "tester_id": 2,
+        "upper_strength": 70.0,
+        "lower_strength": 66.0,
+        "flexibility": 58.0,
+        "endurance": 69.0,
+        "speed": 64.0,
+        "overall_score": 65.4,
+        "notes": "恢复期指标偏弱，维持低强度过渡方案。",
         "created_by": "coach",
     },
 ]
@@ -158,41 +168,54 @@ TRAINING_SYNC_LOGS = [
     {
         "id": 1,
         "fitness_test_id": 1,
-        "player_id": 1,
+        "athlete_id": 1,
+        "coach_id": 2,
         "sync_date": "2026-06-03",
-        "training_duration": 95,
-        "training_intensity": "medium",
+        "plan_name": "体能巩固训练",
+        "hours": 16.0,
+        "intensity": "中",
+        "status": "已完成",
     },
     {
         "id": 2,
         "fitness_test_id": 2,
-        "player_id": 2,
+        "athlete_id": 2,
+        "coach_id": 2,
         "sync_date": "2026-06-11",
-        "training_duration": 88,
-        "training_intensity": "medium",
+        "plan_name": "速度敏捷提升",
+        "hours": 18.0,
+        "intensity": "中",
+        "status": "已完成",
     },
     {
         "id": 3,
         "fitness_test_id": 3,
-        "player_id": 3,
+        "athlete_id": 3,
+        "coach_id": 2,
         "sync_date": "2026-06-18",
-        "training_duration": 105,
-        "training_intensity": "high",
+        "plan_name": "恢复拉伸结合耐力课",
+        "hours": 20.0,
+        "intensity": "高",
+        "status": "进行中",
     },
     {
         "id": 4,
         "fitness_test_id": 4,
-        "player_id": 4,
+        "athlete_id": 4,
+        "coach_id": 2,
         "sync_date": "2026-07-02",
-        "training_duration": 72,
-        "training_intensity": "low",
+        "plan_name": "康复过渡训练",
+        "hours": 12.0,
+        "intensity": "低",
+        "status": "进行中",
     },
 ]
 
 INTENSITY_LABELS = {
-    "low": "低",
-    "medium": "中",
-    "high": "高",
+    "低": "低",
+    "中": "中",
+    "高": "高",
+    "极高": "极高",
 }
 
 MODULE_FEATURES = {
@@ -394,7 +417,8 @@ def create_app():
             active_condition_count=active_condition_count,
             total_count=len(FITNESS_TESTS),
             editing_record=editing_record,
-            player_choices=PLAYERS,
+            athlete_choices=PLAYERS,
+            coach_choices=COACHES,
             summary=summary,
             risk_options=[
                 {"code": "stable", "label": "稳定"},
@@ -402,6 +426,7 @@ def create_app():
                 {"code": "alert", "label": "预警"},
             ],
             intensity_options=INTENSITY_LABELS,
+            plan_status_options=["进行中", "已完成", "已取消"],
         )
 
     rehab_bp = Blueprint("rehab", __name__, url_prefix="/rehab")
@@ -498,8 +523,9 @@ def filter_fitness_tests(args):
     date_to = args.get("date_to", "").strip()
     risk_level = args.get("risk_level", "").strip()
     intensity = args.get("intensity", "").strip()
-    reaction_max = args.get("reaction_max", "").strip()
-    jump_min = args.get("jump_min", "").strip()
+    score_min = args.get("score_min", "").strip()
+    lower_strength_min = args.get("lower_strength_min", "").strip()
+    speed_min = args.get("speed_min", "").strip()
 
     if player_keyword:
         predicates.append(
@@ -513,11 +539,13 @@ def filter_fitness_tests(args):
     if risk_level:
         predicates.append(lambda record, value=risk_level: record["risk_code"] == value)
     if intensity:
-        predicates.append(lambda record, value=intensity: record["training_intensity"] == value)
-    if is_float_value(reaction_max):
-        predicates.append(lambda record, value=float(reaction_max): record["reaction_time"] <= value)
-    if is_float_value(jump_min):
-        predicates.append(lambda record, value=float(jump_min): record["vertical_jump"] >= value)
+        predicates.append(lambda record, value=intensity: record["plan_intensity"] == value)
+    if is_float_value(score_min):
+        predicates.append(lambda record, value=float(score_min): record["overall_score"] >= value)
+    if is_float_value(lower_strength_min):
+        predicates.append(lambda record, value=float(lower_strength_min): record["lower_strength"] >= value)
+    if is_float_value(speed_min):
+        predicates.append(lambda record, value=float(speed_min): record["speed"] >= value)
 
     records = [enrich_fitness_record(item) for item in FITNESS_TESTS]
     records.sort(key=lambda item: (item["test_date"], item["id"]), reverse=True)
@@ -528,27 +556,36 @@ def filter_fitness_tests(args):
 
 
 def enrich_fitness_record(record):
-    player = next((item for item in PLAYERS if item["id"] == record["player_id"]), None)
+    player = next((item for item in PLAYERS if item["id"] == record["athlete_id"]), None)
+    coach = next((item for item in COACHES if item["id"] == record["tester_id"]), None)
+    sync_plan = next((item for item in TRAINING_SYNC_LOGS if item["fitness_test_id"] == record["id"]), None)
     risk = evaluate_fitness_risk(record)
     score = calculate_fitness_score(record)
-    strength_status = classify_metric_status(record["lower_limb_strength"], 150, 170, lower_is_worse=True)
-    mobility_status = classify_metric_status(record["mobility"], 60, 75, lower_is_worse=True)
-    jump_status = classify_metric_status(record["vertical_jump"], 45, 55, lower_is_worse=True)
-    reaction_status = classify_metric_status(record["reaction_time"], 0.40, 0.35, lower_is_worse=False)
+    upper_strength_status = classify_metric_status(record["upper_strength"], 70, 80, lower_is_worse=True)
+    lower_strength_status = classify_metric_status(record["lower_strength"], 70, 80, lower_is_worse=True)
+    flexibility_status = classify_metric_status(record["flexibility"], 70, 80, lower_is_worse=True)
+    endurance_status = classify_metric_status(record["endurance"], 75, 85, lower_is_worse=True)
+    speed_status = classify_metric_status(record["speed"], 75, 85, lower_is_worse=True)
     base = dict(record)
     base.update(
         {
             "player_name": player["name"] if player else "未知运动员",
             "student_no": player["student_no"] if player else "-",
-            "level": player["level"] if player else "-",
+            "level": (player.get("skill_level") or player.get("level")) if player else "-",
+            "tester_name": coach["name"] if coach else "未指定",
             "risk_code": risk["code"],
             "risk_label": risk["label"],
             "risk_class": risk["class"],
             "fitness_score": score,
-            "strength_status": strength_status,
-            "mobility_status": mobility_status,
-            "jump_status": jump_status,
-            "reaction_status": reaction_status,
+            "upper_strength_status": upper_strength_status,
+            "lower_strength_status": lower_strength_status,
+            "flexibility_status": flexibility_status,
+            "endurance_status": endurance_status,
+            "speed_status": speed_status,
+            "plan_name": sync_plan["plan_name"] if sync_plan else "-",
+            "plan_hours": sync_plan["hours"] if sync_plan else 0,
+            "plan_intensity": sync_plan["intensity"] if sync_plan else "",
+            "plan_status": sync_plan["status"] if sync_plan else "-",
         }
     )
     return base
@@ -557,21 +594,25 @@ def enrich_fitness_record(record):
 def evaluate_fitness_risk(record):
     alerts = 0
     observes = 0
-    if record["lower_limb_strength"] < 150:
+    if record["upper_strength"] < 70:
         alerts += 1
-    elif record["lower_limb_strength"] < 170:
+    elif record["upper_strength"] < 80:
         observes += 1
-    if record["mobility"] < 60:
+    if record["lower_strength"] < 70:
         alerts += 1
-    elif record["mobility"] < 75:
+    elif record["lower_strength"] < 80:
         observes += 1
-    if record["vertical_jump"] < 45:
+    if record["flexibility"] < 70:
         alerts += 1
-    elif record["vertical_jump"] < 55:
+    elif record["flexibility"] < 80:
         observes += 1
-    if record["reaction_time"] > 0.4:
+    if record["endurance"] < 75:
         alerts += 1
-    elif record["reaction_time"] > 0.34:
+    elif record["endurance"] < 85:
+        observes += 1
+    if record["speed"] < 75:
+        alerts += 1
+    elif record["speed"] < 85:
         observes += 1
     if alerts >= 2:
         return {"code": "alert", "label": "预警", "class": "danger"}
@@ -581,11 +622,13 @@ def evaluate_fitness_risk(record):
 
 
 def calculate_fitness_score(record):
-    strength = min(record["lower_limb_strength"] / 200 * 100, 100)
-    mobility = min(record["mobility"], 100)
-    jump = min(record["vertical_jump"] / 65 * 100, 100)
-    reaction = max(0, min((0.5 - record["reaction_time"]) / 0.3 * 100, 100))
-    score = strength * 0.28 + mobility * 0.22 + jump * 0.28 + reaction * 0.22
+    score = (
+        record["upper_strength"]
+        + record["lower_strength"]
+        + record["flexibility"]
+        + record["endurance"]
+        + record["speed"]
+    ) / 5
     return round(score, 1)
 
 
@@ -612,11 +655,11 @@ def build_fitness_summary(records):
         month_key = record["test_date"][:7]
         monthly_stats = monthly_map.setdefault(
             month_key,
-            {"jump_total": 0.0, "reaction_total": 0.0, "duration_total": 0, "count": 0},
+            {"score_total": 0.0, "speed_total": 0.0, "hours_total": 0.0, "count": 0},
         )
-        monthly_stats["jump_total"] += record["vertical_jump"]
-        monthly_stats["reaction_total"] += record["reaction_time"]
-        monthly_stats["duration_total"] += record["training_duration"]
+        monthly_stats["score_total"] += record["fitness_score"]
+        monthly_stats["speed_total"] += record["speed"]
+        monthly_stats["hours_total"] += record["plan_hours"]
         monthly_stats["count"] += 1
 
         player_stats = player_map.setdefault(record["player_name"], {"score_total": 0.0, "count": 0})
@@ -624,9 +667,9 @@ def build_fitness_summary(records):
         player_stats["count"] += 1
 
     month_labels = sorted(monthly_map.keys())
-    monthly_jump = [round(monthly_map[key]["jump_total"] / monthly_map[key]["count"], 1) for key in month_labels]
-    monthly_reaction = [round(monthly_map[key]["reaction_total"] / monthly_map[key]["count"], 3) for key in month_labels]
-    monthly_duration = [monthly_map[key]["duration_total"] for key in month_labels]
+    monthly_scores = [round(monthly_map[key]["score_total"] / monthly_map[key]["count"], 1) for key in month_labels]
+    monthly_speed = [round(monthly_map[key]["speed_total"] / monthly_map[key]["count"], 1) for key in month_labels]
+    monthly_hours = [round(monthly_map[key]["hours_total"], 1) for key in month_labels]
 
     player_scores = sorted(
         (
@@ -644,12 +687,12 @@ def build_fitness_summary(records):
         "record_count": len(records),
         "warning_count": risk_counts["预警"],
         "average_score": round(sum(record["fitness_score"] for record in records) / len(records), 1) if records else 0,
-        "avg_reaction": round(sum(record["reaction_time"] for record in records) / len(records), 3) if records else 0,
+        "avg_speed": round(sum(record["speed"] for record in records) / len(records), 1) if records else 0,
         "risk_pie": [{"name": key, "value": value} for key, value in risk_counts.items()],
         "month_labels": month_labels,
-        "monthly_jump": monthly_jump,
-        "monthly_reaction": monthly_reaction,
-        "monthly_duration": monthly_duration,
+        "monthly_scores": monthly_scores,
+        "monthly_speed": monthly_speed,
+        "monthly_hours": monthly_hours,
         "player_names": [item["name"] for item in player_scores],
         "player_scores": [item["score"] for item in player_scores],
     }
@@ -664,7 +707,6 @@ def get_editing_fitness_record(edit_id):
 
 def save_fitness_test(form, operator):
     validated = validate_fitness_form(form)
-    simulate_failure = form.get("simulate_failure") == "1"
     original_tests = deepcopy(FITNESS_TESTS)
     original_logs = deepcopy(TRAINING_SYNC_LOGS)
     try:
@@ -679,10 +721,13 @@ def save_fitness_test(form, operator):
             if sync_log:
                 sync_log.update(
                     {
-                        "player_id": validated["player_id"],
+                        "athlete_id": validated["athlete_id"],
+                        "coach_id": validated["tester_id"],
                         "sync_date": validated["test_date"],
-                        "training_duration": validated["training_duration"],
-                        "training_intensity": validated["training_intensity"],
+                        "plan_name": validated["plan_name"],
+                        "hours": validated["hours"],
+                        "intensity": validated["intensity"],
+                        "status": validated["plan_status"],
                     }
                 )
         else:
@@ -698,15 +743,15 @@ def save_fitness_test(form, operator):
                 {
                     "id": next_id(TRAINING_SYNC_LOGS),
                     "fitness_test_id": new_id,
-                    "player_id": validated["player_id"],
+                    "athlete_id": validated["athlete_id"],
+                    "coach_id": validated["tester_id"],
                     "sync_date": validated["test_date"],
-                    "training_duration": validated["training_duration"],
-                    "training_intensity": validated["training_intensity"],
+                    "plan_name": validated["plan_name"],
+                    "hours": validated["hours"],
+                    "intensity": validated["intensity"],
+                    "status": validated["plan_status"],
                 }
             )
-
-        if simulate_failure:
-            raise RuntimeError("训练计划写入阶段触发异常，已撤销本次体能测试提交。")
     except Exception:
         FITNESS_TESTS[:] = original_tests
         TRAINING_SYNC_LOGS[:] = original_logs
@@ -715,9 +760,12 @@ def save_fitness_test(form, operator):
 
 def validate_fitness_form(form):
     record_id = form.get("record_id", "").strip()
-    player_id = parse_int_field(form.get("player_id", "").strip(), "运动员")
-    if not any(player["id"] == player_id for player in PLAYERS):
+    athlete_id = parse_int_field(form.get("athlete_id", "").strip(), "运动员")
+    if not any(player["id"] == athlete_id for player in PLAYERS):
         raise ValidationError("所选运动员不存在，请重新选择。")
+    tester_id = parse_int_field(form.get("tester_id", "").strip(), "测试教练")
+    if not any(coach["id"] == tester_id for coach in COACHES):
+        raise ValidationError("所选测试教练不存在，请重新选择。")
 
     test_date = form.get("test_date", "").strip()
     try:
@@ -725,31 +773,44 @@ def validate_fitness_form(form):
     except ValueError as exc:
         raise ValidationError("测试日期格式错误，请使用 YYYY-MM-DD。") from exc
 
-    lower_limb_strength = parse_float_range(form.get("lower_limb_strength", "").strip(), "下肢力量", 80, 260)
-    mobility = parse_float_range(form.get("mobility", "").strip(), "关节活动度", 0, 100)
-    vertical_jump = parse_float_range(form.get("vertical_jump", "").strip(), "纵跳高度", 20, 100)
-    reaction_time = parse_float_range(form.get("reaction_time", "").strip(), "反应速度", 0.1, 1.2)
-    training_duration = parse_int_range(form.get("training_duration", "").strip(), "关联训练时长", 10, 360)
+    upper_strength = parse_float_range(form.get("upper_strength", "").strip(), "上肢力量", 0, 100)
+    lower_strength = parse_float_range(form.get("lower_strength", "").strip(), "下肢力量", 0, 100)
+    flexibility = parse_float_range(form.get("flexibility", "").strip(), "柔韧性", 0, 100)
+    endurance = parse_float_range(form.get("endurance", "").strip(), "耐力", 0, 100)
+    speed = parse_float_range(form.get("speed", "").strip(), "速度", 0, 100)
+    hours = parse_float_range(form.get("hours", "").strip(), "训练时长", 0, 999.9)
 
-    training_intensity = form.get("training_intensity", "").strip()
-    if training_intensity not in INTENSITY_LABELS:
-        raise ValidationError("训练强度非法，请从低、中、高中选择。")
+    intensity = form.get("intensity", "").strip()
+    if intensity not in INTENSITY_LABELS:
+        raise ValidationError("训练强度非法，请从低、中、高、极高中选择。")
+    plan_status = form.get("plan_status", "").strip()
+    if plan_status not in {"进行中", "已完成", "已取消"}:
+        raise ValidationError("训练计划状态非法。")
+    plan_name = form.get("plan_name", "").strip()
+    if not plan_name:
+        raise ValidationError("训练计划名称不能为空。")
 
     notes = form.get("notes", "").strip()
     if len(notes) > 120:
         raise ValidationError("备注不能超过 120 个字符。")
 
+    overall_score = round((upper_strength + lower_strength + flexibility + endurance + speed) / 5, 2)
+
     return {
         "record_id": int(record_id) if record_id.isdigit() else None,
-        "player_id": player_id,
+        "athlete_id": athlete_id,
         "test_date": test_date,
-        "lower_limb_strength": lower_limb_strength,
-        "mobility": mobility,
-        "vertical_jump": vertical_jump,
-        "reaction_time": reaction_time,
-        "training_duration": training_duration,
-        "training_intensity": training_intensity,
-        "training_intensity_label": INTENSITY_LABELS[training_intensity],
+        "tester_id": tester_id,
+        "upper_strength": upper_strength,
+        "lower_strength": lower_strength,
+        "flexibility": flexibility,
+        "endurance": endurance,
+        "speed": speed,
+        "overall_score": overall_score,
+        "plan_name": plan_name,
+        "hours": hours,
+        "intensity": intensity,
+        "plan_status": plan_status,
         "notes": notes,
     }
 

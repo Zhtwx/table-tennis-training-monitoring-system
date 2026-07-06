@@ -94,8 +94,8 @@
     <div class="col-6 col-xl-3">
         <div class="card shadow-sm metric-card h-100">
             <div class="card-body">
-                <div class="text-secondary small">平均反应速度</div>
-                <div class="fs-3 fw-bold">{{ summary.avg_reaction }}s</div>
+                <div class="text-secondary small">平均速度评分</div>
+                <div class="fs-3 fw-bold">{{ summary.avg_speed }}</div>
             </div>
         </div>
     </div>
@@ -139,14 +139,19 @@
                 </select>
             </div>
             <div class="col-6 col-md-2">
-                <label for="jump_min" class="form-label">纵跳下限(cm)</label>
-                <input type="number" class="form-control" id="jump_min" name="jump_min" step="0.1"
-                       value="{{ request.args.get('jump_min', '') }}" placeholder=">= 45">
+                <label for="lower_strength_min" class="form-label">下肢力量下限</label>
+                <input type="number" class="form-control" id="lower_strength_min" name="lower_strength_min" step="0.1"
+                       value="{{ request.args.get('lower_strength_min', '') }}" placeholder=">= 70">
             </div>
             <div class="col-6 col-md-2">
-                <label for="reaction_max" class="form-label">反应速度上限(s)</label>
-                <input type="number" class="form-control" id="reaction_max" name="reaction_max" step="0.01"
-                       value="{{ request.args.get('reaction_max', '') }}" placeholder="<= 0.35">
+                <label for="speed_min" class="form-label">速度下限</label>
+                <input type="number" class="form-control" id="speed_min" name="speed_min" step="0.1"
+                       value="{{ request.args.get('speed_min', '') }}" placeholder=">= 75">
+            </div>
+            <div class="col-6 col-md-2">
+                <label for="score_min" class="form-label">体能评分下限</label>
+                <input type="number" class="form-control" id="score_min" name="score_min" step="0.1"
+                       value="{{ request.args.get('score_min', '') }}" placeholder=">= 80">
             </div>
             <div class="col-6 col-md-2 d-grid">
                 <button type="submit" class="btn btn-primary">执行查询</button>
@@ -192,12 +197,23 @@
                 <form method="post" action="{{ url_for('fitness.tests') }}" class="row g-3">
                     <input type="hidden" name="record_id" value="{{ editing_record.id if editing_record else '' }}">
                     <div class="col-12">
-                        <label for="player_id" class="form-label">运动员</label>
-                        <select class="form-select" id="player_id" name="player_id" required>
+                        <label for="athlete_id" class="form-label">运动员</label>
+                        <select class="form-select" id="athlete_id" name="athlete_id" required>
                             <option value="">请选择运动员</option>
-                            {% for player in player_choices %}
-                                <option value="{{ player.id }}" {% if editing_record and editing_record.player_id == player.id %}selected{% endif %}>
+                            {% for player in athlete_choices %}
+                                <option value="{{ player.id }}" {% if editing_record and editing_record.athlete_id == player.id %}selected{% endif %}>
                                     {{ player.student_no }} - {{ player.name }}
+                                </option>
+                            {% endfor %}
+                        </select>
+                    </div>
+                    <div class="col-12">
+                        <label for="tester_id" class="form-label">测试教练</label>
+                        <select class="form-select" id="tester_id" name="tester_id" required>
+                            <option value="">请选择测试教练</option>
+                            {% for coach in coach_choices %}
+                                <option value="{{ coach.id }}" {% if editing_record and editing_record.tester_id == coach.id %}selected{% endif %}>
+                                    {{ coach.name }} / {{ coach.specialty }}
                                 </option>
                             {% endfor %}
                         </select>
@@ -208,50 +224,60 @@
                                value="{{ editing_record.test_date if editing_record else '' }}" required>
                     </div>
                     <div class="col-6">
-                        <label for="lower_limb_strength" class="form-label">下肢力量</label>
-                        <input type="number" class="form-control" id="lower_limb_strength" name="lower_limb_strength"
-                               step="0.1" min="80" max="260" value="{{ editing_record.lower_limb_strength if editing_record else '' }}" required>
+                        <label for="upper_strength" class="form-label">上肢力量</label>
+                        <input type="number" class="form-control" id="upper_strength" name="upper_strength"
+                               step="0.1" min="0" max="100" value="{{ editing_record.upper_strength if editing_record else '' }}" required>
                     </div>
                     <div class="col-6">
-                        <label for="mobility" class="form-label">关节活动度</label>
-                        <input type="number" class="form-control" id="mobility" name="mobility"
-                               step="0.1" min="0" max="100" value="{{ editing_record.mobility if editing_record else '' }}" required>
+                        <label for="lower_strength" class="form-label">下肢力量</label>
+                        <input type="number" class="form-control" id="lower_strength" name="lower_strength"
+                               step="0.1" min="0" max="100" value="{{ editing_record.lower_strength if editing_record else '' }}" required>
                     </div>
                     <div class="col-6">
-                        <label for="vertical_jump" class="form-label">纵跳（爆发力）cm</label>
-                        <input type="number" class="form-control" id="vertical_jump" name="vertical_jump"
-                               step="0.1" min="20" max="100" value="{{ editing_record.vertical_jump if editing_record else '' }}" required>
+                        <label for="flexibility" class="form-label">柔韧性</label>
+                        <input type="number" class="form-control" id="flexibility" name="flexibility"
+                               step="0.1" min="0" max="100" value="{{ editing_record.flexibility if editing_record else '' }}" required>
                     </div>
                     <div class="col-6">
-                        <label for="reaction_time" class="form-label">反应速度(s)</label>
-                        <input type="number" class="form-control" id="reaction_time" name="reaction_time"
-                               step="0.01" min="0.1" max="1.2" value="{{ editing_record.reaction_time if editing_record else '' }}" required>
+                        <label for="endurance" class="form-label">耐力</label>
+                        <input type="number" class="form-control" id="endurance" name="endurance"
+                               step="0.1" min="0" max="100" value="{{ editing_record.endurance if editing_record else '' }}" required>
                     </div>
                     <div class="col-6">
-                        <label for="training_duration" class="form-label">关联训练时长(min)</label>
-                        <input type="number" class="form-control" id="training_duration" name="training_duration"
-                               min="10" max="360" value="{{ editing_record.training_duration if editing_record else '' }}" required>
+                        <label for="speed" class="form-label">速度</label>
+                        <input type="number" class="form-control" id="speed" name="speed"
+                               step="0.1" min="0" max="100" value="{{ editing_record.speed if editing_record else '' }}" required>
                     </div>
                     <div class="col-6">
-                        <label for="training_intensity" class="form-label">训练强度</label>
-                        <select class="form-select" id="training_intensity" name="training_intensity" required>
+                        <label for="hours" class="form-label">训练时长(小时)</label>
+                        <input type="number" class="form-control" id="hours" name="hours"
+                               step="0.1" min="0" max="999.9" value="{{ editing_record.plan_hours if editing_record else '' }}" required>
+                    </div>
+                    <div class="col-12">
+                        <label for="plan_name" class="form-label">关联训练计划名称</label>
+                        <input type="text" class="form-control" id="plan_name" name="plan_name"
+                               value="{{ editing_record.plan_name if editing_record else '' }}" required>
+                    </div>
+                    <div class="col-6">
+                        <label for="intensity" class="form-label">训练强度</label>
+                        <select class="form-select" id="intensity" name="intensity" required>
                             <option value="">请选择</option>
                             {% for code, label in intensity_options.items() %}
-                                <option value="{{ code }}" {% if editing_record and editing_record.training_intensity == code %}selected{% endif %}>{{ label }}</option>
+                                <option value="{{ code }}" {% if editing_record and editing_record.plan_intensity == code %}selected{% endif %}>{{ label }}</option>
+                            {% endfor %}
+                        </select>
+                    </div>
+                    <div class="col-6">
+                        <label for="plan_status" class="form-label">训练计划状态</label>
+                        <select class="form-select" id="plan_status" name="plan_status" required>
+                            {% for status in plan_status_options %}
+                                <option value="{{ status }}" {% if editing_record and editing_record.plan_status == status %}selected{% endif %}>{{ status }}</option>
                             {% endfor %}
                         </select>
                     </div>
                     <div class="col-12">
                         <label for="notes" class="form-label">备注</label>
                         <textarea class="form-control" id="notes" name="notes" rows="3" maxlength="120" placeholder="描述异常、训练建议或恢复安排">{{ editing_record.notes if editing_record else '' }}</textarea>
-                    </div>
-                    <div class="col-12">
-                        <div class="form-check">
-                            <input class="form-check-input" type="checkbox" value="1" id="simulate_failure" name="simulate_failure">
-                            <label class="form-check-label" for="simulate_failure">
-                                模拟事务失败
-                            </label>
-                        </div>
                     </div>
                     <div class="col-12 d-grid gap-2">
                         <button type="submit" class="btn btn-primary">{% if editing_record %}保存修改{% else %}提交记录{% endif %}</button>
@@ -282,28 +308,34 @@
                 </thead>
                 <tbody>
                     <tr>
+                        <td>上肢力量</td>
+                        <td class="text-danger fw-semibold">&lt; 70</td>
+                        <td class="text-warning-emphasis fw-semibold">70 - 79</td>
+                        <td>当前系统按百分制记录，数值越低说明上肢力量越弱。</td>
+                    </tr>
+                    <tr>
                         <td>下肢力量</td>
-                        <td class="text-danger fw-semibold">&lt; 150</td>
-                        <td class="text-warning-emphasis fw-semibold">150 - 169</td>
-                        <td>数值越低，说明力量储备越不足。</td>
+                        <td class="text-danger fw-semibold">&lt; 70</td>
+                        <td class="text-warning-emphasis fw-semibold">70 - 79</td>
+                        <td>数值偏低时，说明下肢力量储备不足。</td>
                     </tr>
                     <tr>
-                        <td>关节活动度</td>
-                        <td class="text-danger fw-semibold">&lt; 60</td>
-                        <td class="text-warning-emphasis fw-semibold">60 - 74</td>
-                        <td>数值偏低时，说明灵活性与活动范围受限。</td>
+                        <td>柔韧性</td>
+                        <td class="text-danger fw-semibold">&lt; 70</td>
+                        <td class="text-warning-emphasis fw-semibold">70 - 79</td>
+                        <td>数值偏低时，说明关节活动范围和柔韧性不足。</td>
                     </tr>
                     <tr>
-                        <td>纵跳（爆发力）</td>
-                        <td class="text-danger fw-semibold">&lt; 45 cm</td>
-                        <td class="text-warning-emphasis fw-semibold">45 - 54 cm</td>
-                        <td>数值偏低时，说明下肢爆发力不足。</td>
+                        <td>耐力</td>
+                        <td class="text-danger fw-semibold">&lt; 75</td>
+                        <td class="text-warning-emphasis fw-semibold">75 - 84</td>
+                        <td>数值偏低时，说明持续训练能力不足。</td>
                     </tr>
                     <tr>
-                        <td>反应速度</td>
-                        <td class="text-danger fw-semibold">&gt; 0.40 s</td>
-                        <td class="text-warning-emphasis fw-semibold">0.35 - 0.40 s</td>
-                        <td>时间越长越慢，说明神经反应效率下降。</td>
+                        <td>速度</td>
+                        <td class="text-danger fw-semibold">&lt; 75</td>
+                        <td class="text-warning-emphasis fw-semibold">75 - 84</td>
+                        <td>数值偏低时，说明启动与移动速度表现不足。</td>
                     </tr>
                 </tbody>
             </table>
@@ -316,14 +348,11 @@
 
 <div class="card shadow-sm mb-4">
     <div class="card-header bg-white border-0 pt-4 px-4">
-        <h2 class="h5 mb-1">体能评分加权公式</h2>
+        <h2 class="h5 mb-1">体能评分计算公式</h2>
     </div>
     <div class="card-body">
         <div class="fw-semibold mb-2">
-            体能评分 = 下肢力量 × 28% + 关节活动度 × 22% + 纵跳 × 28% + 反应速度 × 22%
-        </div>
-        <div class="text-secondary small">
-            其中下肢力量按 200 换算为百分制，纵跳按 65cm 换算为百分制，反应速度按“越短越好”进行反向换算。
+            体能评分 = (上肢力量 + 下肢力量 + 柔韧性 + 耐力 + 速度) ÷ 5
         </div>
     </div>
 </div>
@@ -340,9 +369,11 @@
                     <tr>
                         <th class="text-nowrap">日期</th>
                         <th class="text-nowrap">运动员</th>
-                        <th class="text-nowrap">关节活动度</th>
-                        <th class="text-nowrap">纵跳</th>
-                        <th class="text-nowrap">反应速度</th>
+                        <th class="text-nowrap">上肢力量</th>
+                        <th class="text-nowrap">下肢力量</th>
+                        <th class="text-nowrap">柔韧性</th>
+                        <th class="text-nowrap">耐力</th>
+                        <th class="text-nowrap">速度</th>
                         <th class="text-nowrap">训练时长</th>
                         <th class="text-nowrap">训练强度</th>
                         <th class="text-nowrap">体能评分</th>
@@ -358,33 +389,49 @@
                                 <div class="fw-semibold">{{ record.player_name }}</div>
                                 <div class="text-secondary small">{{ record.student_no }} / {{ record.level }}</div>
                             </td>
-                            <td class="{% if record.mobility_status == 'alert' %}metric-alert{% elif record.mobility_status == 'observe' %}metric-observe{% endif %}">
-                                {{ record.mobility }}
-                                {% if record.mobility_status == 'alert' %}
+                            <td class="{% if record.upper_strength_status == 'alert' %}metric-alert{% elif record.upper_strength_status == 'observe' %}metric-observe{% endif %}">
+                                {{ record.upper_strength }}
+                                {% if record.upper_strength_status == 'alert' %}
                                     <span class="metric-tag metric-tag-alert">预警</span>
-                                {% elif record.mobility_status == 'observe' %}
+                                {% elif record.upper_strength_status == 'observe' %}
                                     <span class="metric-tag metric-tag-observe">观察</span>
                                 {% endif %}
                             </td>
-                            <td class="{% if record.jump_status == 'alert' %}metric-alert{% elif record.jump_status == 'observe' %}metric-observe{% endif %}">
-                                {{ record.vertical_jump }} cm
-                                {% if record.jump_status == 'alert' %}
+                            <td class="{% if record.lower_strength_status == 'alert' %}metric-alert{% elif record.lower_strength_status == 'observe' %}metric-observe{% endif %}">
+                                {{ record.lower_strength }}
+                                {% if record.lower_strength_status == 'alert' %}
                                     <span class="metric-tag metric-tag-alert">预警</span>
-                                {% elif record.jump_status == 'observe' %}
+                                {% elif record.lower_strength_status == 'observe' %}
                                     <span class="metric-tag metric-tag-observe">观察</span>
                                 {% endif %}
                             </td>
-                            <td class="{% if record.reaction_status == 'alert' %}metric-alert{% elif record.reaction_status == 'observe' %}metric-observe{% endif %}">
-                                {{ record.reaction_time }} s
-                                {% if record.reaction_status == 'alert' %}
+                            <td class="{% if record.flexibility_status == 'alert' %}metric-alert{% elif record.flexibility_status == 'observe' %}metric-observe{% endif %}">
+                                {{ record.flexibility }}
+                                {% if record.flexibility_status == 'alert' %}
                                     <span class="metric-tag metric-tag-alert">预警</span>
-                                {% elif record.reaction_status == 'observe' %}
+                                {% elif record.flexibility_status == 'observe' %}
                                     <span class="metric-tag metric-tag-observe">观察</span>
                                 {% endif %}
                             </td>
-                            <td>{{ record.training_duration }} min</td>
-                            <td>{{ record.training_intensity_label }}</td>
-                            <td class="{% if record.strength_status == 'alert' %}metric-alert{% elif record.strength_status == 'observe' %}metric-observe{% endif %}">
+                            <td class="{% if record.endurance_status == 'alert' %}metric-alert{% elif record.endurance_status == 'observe' %}metric-observe{% endif %}">
+                                {{ record.endurance }}
+                                {% if record.endurance_status == 'alert' %}
+                                    <span class="metric-tag metric-tag-alert">预警</span>
+                                {% elif record.endurance_status == 'observe' %}
+                                    <span class="metric-tag metric-tag-observe">观察</span>
+                                {% endif %}
+                            </td>
+                            <td class="{% if record.speed_status == 'alert' %}metric-alert{% elif record.speed_status == 'observe' %}metric-observe{% endif %}">
+                                {{ record.speed }}
+                                {% if record.speed_status == 'alert' %}
+                                    <span class="metric-tag metric-tag-alert">预警</span>
+                                {% elif record.speed_status == 'observe' %}
+                                    <span class="metric-tag metric-tag-observe">观察</span>
+                                {% endif %}
+                            </td>
+                            <td>{{ record.plan_hours }} h</td>
+                            <td>{{ record.plan_intensity }}</td>
+                            <td>
                                 {{ record.fitness_score }}
                             </td>
                             <td><span class="badge text-bg-{{ record.risk_class }}">{{ record.risk_label }}</span></td>
@@ -394,7 +441,7 @@
                         </tr>
                     {% else %}
                         <tr>
-                            <td colspan="10" class="text-center text-secondary py-5">没有符合条件的体能测试记录。</td>
+                            <td colspan="13" class="text-center text-secondary py-5">没有符合条件的体能测试记录。</td>
                         </tr>
                     {% endfor %}
                 </tbody>
@@ -457,27 +504,27 @@
                 data: {{ summary.month_labels | tojson }}
             },
             yAxis: [
-                { type: 'value', name: '纵跳/时长' },
-                { type: 'value', name: '反应速度(s)' }
+                { type: 'value', name: '评分/时长' },
+                { type: 'value', name: '速度评分' }
             ],
             series: [
                 {
-                    name: '平均纵跳',
+                    name: '平均体能评分',
                     type: 'line',
                     smooth: true,
-                    data: {{ summary.monthly_jump | tojson }}
+                    data: {{ summary.monthly_scores | tojson }}
                 },
                 {
                     name: '训练总时长',
                     type: 'bar',
-                    data: {{ summary.monthly_duration | tojson }}
+                    data: {{ summary.monthly_hours | tojson }}
                 },
                 {
-                    name: '平均反应速度',
+                    name: '平均速度评分',
                     type: 'line',
                     smooth: true,
                     yAxisIndex: 1,
-                    data: {{ summary.monthly_reaction | tojson }}
+                    data: {{ summary.monthly_speed | tojson }}
                 }
             ]
         });
