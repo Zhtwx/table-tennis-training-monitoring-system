@@ -98,6 +98,40 @@ PLAYERS = [
         "injury_status_code": "injured",
     },
 ]
+# 教练模拟数据
+COACHES = [
+    {"id": 1, "name": "张教练", "gender": "男", "specialty": "乒乓球专项训练"},
+    {"id": 2, "name": "李教练", "gender": "女", "specialty": "体能训练与康复"},
+]
+
+# 训练计划模拟数据（内存存储）
+TRAINING_PLANS = [
+    {
+        "id": 1,
+        "athlete_id": 1,
+        "athlete_name": "王一鸣",
+        "coach_id": 1,
+        "coach_name": "张教练",
+        "plan_date": "2026-07-01",
+        "content": "正手攻球+反手推挡",
+        "intensity": "高",
+        "duration": 90,
+        "location": "训练馆A",
+    },
+    {
+        "id": 2,
+        "athlete_id": 2,
+        "athlete_name": "李清扬",
+        "coach_id": 2,
+        "coach_name": "李教练",
+        "plan_date": "2026-07-02",
+        "content": "发球抢攻战术",
+        "intensity": "中",
+        "duration": 75,
+        "location": "训练馆B",
+    },
+]
+PLAN_ID_COUNTER = 3
 
 COACHES = [
     {"id": 1, "name": "陈指导", "specialty": "技术训练"},
@@ -359,10 +393,128 @@ def create_app():
     training_bp = Blueprint("training", __name__, url_prefix="/training")
 
     @training_bp.route("/plans", endpoint="plans")
-    @role_required("admin", "coach")
+    @training_bp.route("/plans", methods=["GET", "POST"])
     def training_plans():
-        return module_page("训练计划管理", "制定、跟踪和复盘运动员训练计划。")
+        """训练计划列表、查询、新增"""
+        if request.method == "POST":
+            athlete_id = request.form.get("athlete_id")
+            coach_id = request.form.get("coach_id")
+            plan_date = request.form.get("plan_date")
+            content = request.form.get("content")
+            intensity = request.form.get("intensity")
+            duration = request.form.get("duration")
+            location = request.form.get("location")
 
+            if not all([athlete_id, coach_id, plan_date, content]):
+                flash("请填写完整信息（运动员、教练、日期、内容为必填）", "warning")
+                return redirect(url_for("training.plans"))
+
+            athlete = next((p for p in PLAYERS if str(p["id"]) == athlete_id), None)
+            coach = next((c for c in COACHES if str(c["id"]) == coach_id), None)
+            if not athlete or not coach:
+                flash("运动员或教练不存在", "danger")
+                return redirect(url_for("training.plans"))
+
+            global PLAN_ID_COUNTER
+            new_plan = {
+                "id": PLAN_ID_COUNTER,
+                "athlete_id": int(athlete_id),
+                "athlete_name": athlete["name"],
+                "coach_id": int(coach_id),
+                "coach_name": coach["name"],
+                "plan_date": plan_date,
+                "content": content,
+                "intensity": intensity,
+                "duration": int(duration) if duration else 60,
+                "location": location or "",
+            }
+            TRAINING_PLANS.append(new_plan)
+            PLAN_ID_COUNTER += 1
+            flash("训练计划添加成功", "success")
+            return redirect(url_for("training.plans"))
+
+        # GET 请求：查询与列表展示
+        athlete_name = request.args.get("athlete_name", "").strip()
+        start_date = request.args.get("start_date", "").strip()
+        end_date = request.args.get("end_date", "").strip()
+        content_keyword = request.args.get("content", "").strip()
+
+        filtered = TRAINING_PLANS.copy()
+        if athlete_name:
+            filtered = [p for p in filtered if athlete_name.lower() in p["athlete_name"].lower()]
+        if start_date:
+            filtered = [p for p in filtered if p["plan_date"] >= start_date]
+        if end_date:
+            filtered = [p for p in filtered if p["plan_date"] <= end_date]
+        if content_keyword:
+            filtered = [p for p in filtered if content_keyword.lower() in p["content"].lower()]
+
+        filtered.sort(key=lambda x: x["plan_date"], reverse=True)
+
+        return render_template(
+            "training/plans.html",
+            plans=filtered,
+            athletes=PLAYERS,
+            coaches=COACHES,
+            athlete_name=athlete_name,
+            start_date=start_date,
+            end_date=end_date,
+            content=content_keyword,
+        )
+   
+    @training_bp.route("/plans/<int:plan_id>/edit", methods=["GET", "POST"])
+    @role_required("admin", "coach")
+    def edit_plan(plan_id):
+        """编辑训练计划"""
+        plan = next((p for p in TRAINING_PLANS if p["id"] == plan_id), None)
+        if not plan:
+            flash("训练计划不存在", "danger")
+            return redirect(url_for("training.plans"))
+
+        if request.method == "POST":
+            athlete_id = request.form.get("athlete_id")
+            coach_id = request.form.get("coach_id")
+            plan_date = request.form.get("plan_date")
+            content = request.form.get("content")
+            intensity = request.form.get("intensity")
+            duration = request.form.get("duration")
+            location = request.form.get("location")
+
+            if not all([athlete_id, coach_id, plan_date, content]):
+                flash("请填写完整信息", "warning")
+                return render_template("training/plan_form.html", plan=plan, athletes=PLAYERS, coaches=COACHES)
+
+            athlete = next((p for p in PLAYERS if str(p["id"]) == athlete_id), None)
+            coach = next((c for c in COACHES if str(c["id"]) == coach_id), None)
+            if not athlete or not coach:
+                flash("运动员或教练不存在", "danger")
+                return render_template("training/plan_form.html", plan=plan, athletes=PLAYERS, coaches=COACHES)
+
+            plan.update({
+                "athlete_id": int(athlete_id),
+                "athlete_name": athlete["name"],
+                "coach_id": int(coach_id),
+                "coach_name": coach["name"],
+                "plan_date": plan_date,
+                "content": content,
+                "intensity": intensity,
+                "duration": int(duration) if duration else 60,
+                "location": location or "",
+            })
+            flash("训练计划更新成功", "success")
+            return redirect(url_for("training.plans"))
+
+        return render_template("training/plan_form.html", plan=plan, athletes=PLAYERS, coaches=COACHES)
+
+
+    @training_bp.route("/plans/<int:plan_id>/delete", methods=["POST"])
+    @role_required("admin", "coach")
+    def delete_plan(plan_id):
+        """删除训练计划"""
+        global TRAINING_PLANS
+        TRAINING_PLANS = [p for p in TRAINING_PLANS if p["id"] != plan_id]
+        flash("训练计划已删除", "success")
+        return redirect(url_for("training.plans"))
     @training_bp.route("/batch-import", methods=["GET", "POST"], endpoint="batch_import")
     @role_required("admin", "coach")
     def training_batch_import():
