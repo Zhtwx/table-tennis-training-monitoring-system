@@ -1,0 +1,539 @@
+{% extends "base.html" %}
+
+{% block title %}体能测试模块 - 乒乓球运动员综合训练监控管理系统{% endblock %}
+
+{% block extra_css %}
+<style>
+    .metric-card {
+        border-left: 4px solid var(--tt-primary);
+    }
+
+    .metric-alert {
+        color: #dc3545;
+        font-weight: 700;
+    }
+
+    .metric-observe {
+        color: #b7791f;
+        font-weight: 700;
+    }
+
+    .rule-table td,
+    .rule-table th {
+        white-space: nowrap;
+    }
+
+    .metric-tag {
+        display: inline-block;
+        margin-left: .35rem;
+        padding: .08rem .4rem;
+        border-radius: 999px;
+        font-size: .72rem;
+        line-height: 1.2;
+    }
+
+    .metric-tag-alert {
+        background: #f8d7da;
+        color: #b02a37;
+    }
+
+    .metric-tag-observe {
+        background: #fff3cd;
+        color: #946200;
+    }
+
+    .form-panel {
+        position: sticky;
+        top: 88px;
+    }
+
+    .chart-box-sm {
+        width: 100%;
+        height: 320px;
+    }
+    @media (max-width: 991.98px) {
+        .form-panel {
+            position: static;
+        }
+    }
+</style>
+{% endblock %}
+
+{% block content %}
+<div class="d-flex flex-column flex-md-row align-items-md-center justify-content-between gap-3 mb-4">
+    <div>
+        <h1 class="page-title h3 mb-1">体能测试模块与异常数据拦截</h1>
+    </div>
+</div>
+
+<div class="row g-3 mb-4">
+    <div class="col-6 col-xl-3">
+        <div class="card shadow-sm metric-card h-100">
+            <div class="card-body">
+                <div class="text-secondary small">记录总数</div>
+                <div class="fs-3 fw-bold">{{ summary.record_count }}</div>
+            </div>
+        </div>
+    </div>
+    <div class="col-6 col-xl-3">
+        <div class="card shadow-sm metric-card h-100">
+            <div class="card-body">
+                <div class="text-secondary small">平均体能评分</div>
+                <div class="fs-3 fw-bold">{{ summary.average_score }}</div>
+            </div>
+        </div>
+    </div>
+    <div class="col-6 col-xl-3">
+        <div class="card shadow-sm metric-card h-100">
+            <div class="card-body">
+                <div class="text-secondary small">预警记录数</div>
+                <div class="fs-3 fw-bold text-danger">{{ summary.warning_count }}</div>
+            </div>
+        </div>
+    </div>
+    <div class="col-6 col-xl-3">
+        <div class="card shadow-sm metric-card h-100">
+            <div class="card-body">
+                <div class="text-secondary small">平均速度评分</div>
+                <div class="fs-3 fw-bold">{{ summary.avg_speed }}</div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<div class="card shadow-sm mb-4">
+    <div class="card-header bg-white border-0 pt-4 px-4">
+        <h2 class="h5 mb-1">模糊符合查询 + 统计查询</h2>
+    </div>
+    <div class="card-body">
+        <form class="row g-3 align-items-end" method="get" action="{{ url_for('fitness.tests') }}">
+            <div class="col-12 col-md-3">
+                <label for="player_keyword" class="form-label">运动员关键词</label>
+                <input type="text" class="form-control" id="player_keyword" name="player_keyword"
+                       value="{{ request.args.get('player_keyword', '') }}" placeholder="姓名或学号模糊匹配">
+            </div>
+            <div class="col-6 col-md-2">
+                <label for="date_from" class="form-label">开始日期</label>
+                <input type="date" class="form-control" id="date_from" name="date_from" value="{{ request.args.get('date_from', '') }}">
+            </div>
+            <div class="col-6 col-md-2">
+                <label for="date_to" class="form-label">结束日期</label>
+                <input type="date" class="form-control" id="date_to" name="date_to" value="{{ request.args.get('date_to', '') }}">
+            </div>
+            <div class="col-6 col-md-2">
+                <label for="risk_level" class="form-label">风险等级</label>
+                <select class="form-select" id="risk_level" name="risk_level">
+                    <option value="">不限</option>
+                    {% for option in risk_options %}
+                        <option value="{{ option.code }}" {% if request.args.get('risk_level') == option.code %}selected{% endif %}>{{ option.label }}</option>
+                    {% endfor %}
+                </select>
+            </div>
+            <div class="col-6 col-md-2">
+                <label for="intensity" class="form-label">训练强度</label>
+                <select class="form-select" id="intensity" name="intensity">
+                    <option value="">不限</option>
+                    {% for code, label in intensity_options.items() %}
+                        <option value="{{ code }}" {% if request.args.get('intensity') == code %}selected{% endif %}>{{ label }}</option>
+                    {% endfor %}
+                </select>
+            </div>
+            <div class="col-6 col-md-2">
+                <label for="lower_strength_min" class="form-label">下肢力量下限</label>
+                <input type="number" class="form-control" id="lower_strength_min" name="lower_strength_min" step="0.1"
+                       value="{{ request.args.get('lower_strength_min', '') }}" placeholder=">= 70">
+            </div>
+            <div class="col-6 col-md-2">
+                <label for="speed_min" class="form-label">速度下限</label>
+                <input type="number" class="form-control" id="speed_min" name="speed_min" step="0.1"
+                       value="{{ request.args.get('speed_min', '') }}" placeholder=">= 75">
+            </div>
+            <div class="col-6 col-md-2">
+                <label for="score_min" class="form-label">体能评分下限</label>
+                <input type="number" class="form-control" id="score_min" name="score_min" step="0.1"
+                       value="{{ request.args.get('score_min', '') }}" placeholder=">= 80">
+            </div>
+            <div class="col-6 col-md-2 d-grid">
+                <button type="submit" class="btn btn-primary">执行查询</button>
+            </div>
+            <div class="col-6 col-md-2 d-grid">
+                <a href="{{ url_for('fitness.tests') }}" class="btn btn-outline-secondary">重置条件</a>
+            </div>
+        </form>
+        <div class="mt-3 text-secondary small">
+            当前命中 {{ fitness_records|length }} 条记录，共 {{ total_count }} 条，启用 {{ active_condition_count }} 个查询条件。
+        </div>
+    </div>
+</div>
+
+<div class="row g-4 mb-4">
+    <div class="col-12 col-xl-8">
+        <div class="card shadow-sm h-100">
+            <div class="card-header bg-white border-0 pt-4 px-4">
+                <h2 class="h5 mb-1">统计图表展示</h2>
+            </div>
+            <div class="card-body">
+                <div class="row g-4">
+                    <div class="col-12 col-lg-6">
+                        <div id="riskPieChart" class="chart-box-sm"></div>
+                    </div>
+                    <div class="col-12 col-lg-6">
+                        <div id="scoreBarChart" class="chart-box-sm"></div>
+                    </div>
+                    <div class="col-12">
+                        <div id="trendLineChart" class="chart-box"></div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <div class="col-12 col-xl-4">
+        <div class="card shadow-sm form-panel">
+            <div class="card-header bg-white border-0 pt-4 px-4">
+                <h2 class="h5 mb-1">{% if editing_record %}修改体能测试记录{% else %}新增体能测试记录{% endif %}</h2>
+            </div>
+            <div class="card-body">
+                <form method="post" action="{{ url_for('fitness.tests') }}" class="row g-3">
+                    <input type="hidden" name="record_id" value="{{ editing_record.id if editing_record else '' }}">
+                    <div class="col-12">
+                        <label for="athlete_id" class="form-label">运动员</label>
+                        <select class="form-select" id="athlete_id" name="athlete_id" required>
+                            <option value="">请选择运动员</option>
+                            {% for player in athlete_choices %}
+                                <option value="{{ player.id }}" {% if editing_record and editing_record.athlete_id == player.id %}selected{% endif %}>
+                                    {{ player.student_no }} - {{ player.name }}
+                                </option>
+                            {% endfor %}
+                        </select>
+                    </div>
+                    <div class="col-12">
+                        <label for="tester_id" class="form-label">测试教练</label>
+                        <select class="form-select" id="tester_id" name="tester_id" required>
+                            <option value="">请选择测试教练</option>
+                            {% for coach in coach_choices %}
+                                <option value="{{ coach.id }}" {% if editing_record and editing_record.tester_id == coach.id %}selected{% endif %}>
+                                    {{ coach.name }} / {{ coach.specialty }}
+                                </option>
+                            {% endfor %}
+                        </select>
+                    </div>
+                    <div class="col-12">
+                        <label for="test_date" class="form-label">测试日期</label>
+                        <input type="date" class="form-control" id="test_date" name="test_date"
+                               value="{{ editing_record.test_date if editing_record else '' }}" required>
+                    </div>
+                    <div class="col-6">
+                        <label for="upper_strength" class="form-label">上肢力量</label>
+                        <input type="number" class="form-control" id="upper_strength" name="upper_strength"
+                               step="0.1" min="0" max="100" value="{{ editing_record.upper_strength if editing_record else '' }}" required>
+                    </div>
+                    <div class="col-6">
+                        <label for="lower_strength" class="form-label">下肢力量</label>
+                        <input type="number" class="form-control" id="lower_strength" name="lower_strength"
+                               step="0.1" min="0" max="100" value="{{ editing_record.lower_strength if editing_record else '' }}" required>
+                    </div>
+                    <div class="col-6">
+                        <label for="flexibility" class="form-label">柔韧性</label>
+                        <input type="number" class="form-control" id="flexibility" name="flexibility"
+                               step="0.1" min="0" max="100" value="{{ editing_record.flexibility if editing_record else '' }}" required>
+                    </div>
+                    <div class="col-6">
+                        <label for="endurance" class="form-label">耐力</label>
+                        <input type="number" class="form-control" id="endurance" name="endurance"
+                               step="0.1" min="0" max="100" value="{{ editing_record.endurance if editing_record else '' }}" required>
+                    </div>
+                    <div class="col-6">
+                        <label for="speed" class="form-label">速度</label>
+                        <input type="number" class="form-control" id="speed" name="speed"
+                               step="0.1" min="0" max="100" value="{{ editing_record.speed if editing_record else '' }}" required>
+                    </div>
+                    <div class="col-6">
+                        <label for="hours" class="form-label">训练时长(小时)</label>
+                        <input type="number" class="form-control" id="hours" name="hours"
+                               step="0.1" min="0" max="999.9" value="{{ editing_record.plan_hours if editing_record else '' }}" required>
+                    </div>
+                    <div class="col-12">
+                        <label for="plan_name" class="form-label">关联训练计划名称</label>
+                        <input type="text" class="form-control" id="plan_name" name="plan_name"
+                               value="{{ editing_record.plan_name if editing_record else '' }}" required>
+                    </div>
+                    <div class="col-6">
+                        <label for="intensity" class="form-label">训练强度</label>
+                        <select class="form-select" id="intensity" name="intensity" required>
+                            <option value="">请选择</option>
+                            {% for code, label in intensity_options.items() %}
+                                <option value="{{ code }}" {% if editing_record and editing_record.plan_intensity == code %}selected{% endif %}>{{ label }}</option>
+                            {% endfor %}
+                        </select>
+                    </div>
+                    <div class="col-6">
+                        <label for="plan_status" class="form-label">训练计划状态</label>
+                        <select class="form-select" id="plan_status" name="plan_status" required>
+                            {% for status in plan_status_options %}
+                                <option value="{{ status }}" {% if editing_record and editing_record.plan_status == status %}selected{% endif %}>{{ status }}</option>
+                            {% endfor %}
+                        </select>
+                    </div>
+                    <div class="col-12">
+                        <label for="notes" class="form-label">备注</label>
+                        <textarea class="form-control" id="notes" name="notes" rows="3" maxlength="120" placeholder="描述异常、训练建议或恢复安排">{{ editing_record.notes if editing_record else '' }}</textarea>
+                    </div>
+                    <div class="col-12 d-grid gap-2">
+                        <button type="submit" class="btn btn-primary">{% if editing_record %}保存修改{% else %}提交记录{% endif %}</button>
+                        {% if editing_record %}
+                            <a href="{{ url_for('fitness.tests') }}" class="btn btn-outline-secondary">取消编辑</a>
+                        {% endif %}
+                    </div>
+                </form>
+            </div>
+        </div>
+    </div>
+</div>
+
+<div class="card shadow-sm mb-4">
+    <div class="card-header bg-white border-0 pt-4 px-4">
+        <h2 class="h5 mb-1">风险判定规则</h2>
+    </div>
+    <div class="card-body">
+        <div class="table-responsive">
+            <table class="table align-middle rule-table mb-0">
+                <thead class="table-light">
+                    <tr>
+                        <th>指标</th>
+                        <th>预警阈值</th>
+                        <th>观察阈值</th>
+                        <th>说明</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    <tr>
+                        <td>上肢力量</td>
+                        <td class="text-danger fw-semibold">&lt; 70</td>
+                        <td class="text-warning-emphasis fw-semibold">70 - 79</td>
+                        <td>当前系统按百分制记录，数值越低说明上肢力量越弱。</td>
+                    </tr>
+                    <tr>
+                        <td>下肢力量</td>
+                        <td class="text-danger fw-semibold">&lt; 70</td>
+                        <td class="text-warning-emphasis fw-semibold">70 - 79</td>
+                        <td>数值偏低时，说明下肢力量储备不足。</td>
+                    </tr>
+                    <tr>
+                        <td>柔韧性</td>
+                        <td class="text-danger fw-semibold">&lt; 70</td>
+                        <td class="text-warning-emphasis fw-semibold">70 - 79</td>
+                        <td>数值偏低时，说明关节活动范围和柔韧性不足。</td>
+                    </tr>
+                    <tr>
+                        <td>耐力</td>
+                        <td class="text-danger fw-semibold">&lt; 75</td>
+                        <td class="text-warning-emphasis fw-semibold">75 - 84</td>
+                        <td>数值偏低时，说明持续训练能力不足。</td>
+                    </tr>
+                    <tr>
+                        <td>速度</td>
+                        <td class="text-danger fw-semibold">&lt; 75</td>
+                        <td class="text-warning-emphasis fw-semibold">75 - 84</td>
+                        <td>数值偏低时，说明启动与移动速度表现不足。</td>
+                    </tr>
+                </tbody>
+            </table>
+        </div>
+        <div class="text-secondary small mt-3">
+            风险等级判定：2 项及以上预警记为“预警”；1 项预警或 2 项观察记为“观察”；其余记为“稳定”。
+        </div>
+    </div>
+</div>
+
+<div class="card shadow-sm mb-4">
+    <div class="card-header bg-white border-0 pt-4 px-4">
+        <h2 class="h5 mb-1">体能评分计算公式</h2>
+    </div>
+    <div class="card-body">
+        <div class="fw-semibold mb-2">
+            体能评分 = (上肢力量 + 下肢力量 + 柔韧性 + 耐力 + 速度) ÷ 5
+        </div>
+    </div>
+</div>
+
+<div class="card shadow-sm">
+    <div class="card-header bg-white border-0 pt-4 px-4">
+        <h2 class="h5 mb-1">历史查询结果</h2>
+        <div class="text-secondary small">红色表示达到预警阈值，黄色表示达到观察阈值。</div>
+    </div>
+    <div class="card-body">
+        <div class="table-responsive">
+            <table class="table table-hover align-middle" style="min-width: 1180px;">
+                <thead class="table-light">
+                    <tr>
+                        <th class="text-nowrap">日期</th>
+                        <th class="text-nowrap">运动员</th>
+                        <th class="text-nowrap">上肢力量</th>
+                        <th class="text-nowrap">下肢力量</th>
+                        <th class="text-nowrap">柔韧性</th>
+                        <th class="text-nowrap">耐力</th>
+                        <th class="text-nowrap">速度</th>
+                        <th class="text-nowrap">训练时长</th>
+                        <th class="text-nowrap">训练强度</th>
+                        <th class="text-nowrap">体能评分</th>
+                        <th class="text-nowrap">风险等级</th>
+                        <th class="text-end text-nowrap">操作</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for record in fitness_records %}
+                        <tr>
+                            <td>{{ record.test_date }}</td>
+                            <td>
+                                <div class="fw-semibold">{{ record.player_name }}</div>
+                                <div class="text-secondary small">{{ record.student_no }} / {{ record.level }}</div>
+                            </td>
+                            <td class="{% if record.upper_strength_status == 'alert' %}metric-alert{% elif record.upper_strength_status == 'observe' %}metric-observe{% endif %}">
+                                {{ record.upper_strength }}
+                                {% if record.upper_strength_status == 'alert' %}
+                                    <span class="metric-tag metric-tag-alert">预警</span>
+                                {% elif record.upper_strength_status == 'observe' %}
+                                    <span class="metric-tag metric-tag-observe">观察</span>
+                                {% endif %}
+                            </td>
+                            <td class="{% if record.lower_strength_status == 'alert' %}metric-alert{% elif record.lower_strength_status == 'observe' %}metric-observe{% endif %}">
+                                {{ record.lower_strength }}
+                                {% if record.lower_strength_status == 'alert' %}
+                                    <span class="metric-tag metric-tag-alert">预警</span>
+                                {% elif record.lower_strength_status == 'observe' %}
+                                    <span class="metric-tag metric-tag-observe">观察</span>
+                                {% endif %}
+                            </td>
+                            <td class="{% if record.flexibility_status == 'alert' %}metric-alert{% elif record.flexibility_status == 'observe' %}metric-observe{% endif %}">
+                                {{ record.flexibility }}
+                                {% if record.flexibility_status == 'alert' %}
+                                    <span class="metric-tag metric-tag-alert">预警</span>
+                                {% elif record.flexibility_status == 'observe' %}
+                                    <span class="metric-tag metric-tag-observe">观察</span>
+                                {% endif %}
+                            </td>
+                            <td class="{% if record.endurance_status == 'alert' %}metric-alert{% elif record.endurance_status == 'observe' %}metric-observe{% endif %}">
+                                {{ record.endurance }}
+                                {% if record.endurance_status == 'alert' %}
+                                    <span class="metric-tag metric-tag-alert">预警</span>
+                                {% elif record.endurance_status == 'observe' %}
+                                    <span class="metric-tag metric-tag-observe">观察</span>
+                                {% endif %}
+                            </td>
+                            <td class="{% if record.speed_status == 'alert' %}metric-alert{% elif record.speed_status == 'observe' %}metric-observe{% endif %}">
+                                {{ record.speed }}
+                                {% if record.speed_status == 'alert' %}
+                                    <span class="metric-tag metric-tag-alert">预警</span>
+                                {% elif record.speed_status == 'observe' %}
+                                    <span class="metric-tag metric-tag-observe">观察</span>
+                                {% endif %}
+                            </td>
+                            <td>{{ record.plan_hours }} h</td>
+                            <td>{{ record.plan_intensity }}</td>
+                            <td>
+                                {{ record.fitness_score }}
+                            </td>
+                            <td><span class="badge text-bg-{{ record.risk_class }}">{{ record.risk_label }}</span></td>
+                            <td class="text-end">
+                                <a href="{{ url_for('fitness.tests', edit_id=record.id) }}" class="btn btn-sm btn-outline-primary">修改</a>
+                            </td>
+                        </tr>
+                    {% else %}
+                        <tr>
+                            <td colspan="13" class="text-center text-secondary py-5">没有符合条件的体能测试记录。</td>
+                        </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+    document.addEventListener('DOMContentLoaded', function () {
+        const pieChart = echarts.init(document.getElementById('riskPieChart'));
+        const barChart = echarts.init(document.getElementById('scoreBarChart'));
+        const lineChart = echarts.init(document.getElementById('trendLineChart'));
+
+        pieChart.setOption({
+            tooltip: { trigger: 'item' },
+            legend: { bottom: 0, left: 'center' },
+            series: [{
+                type: 'pie',
+                radius: ['40%', '68%'],
+                itemStyle: { borderColor: '#fff', borderWidth: 2, borderRadius: 8 },
+                data: {{ summary.risk_pie | tojson }}
+            }]
+        });
+
+        barChart.setOption({
+            title: {
+                text: '体能评分',
+                left: 12,
+                top: 0,
+                textStyle: {
+                    fontSize: 14,
+                    fontWeight: 600,
+                    color: '#374151'
+                }
+            },
+            tooltip: { trigger: 'axis' },
+            grid: { left: 56, right: 16, top: 56, bottom: 60, containLabel: true },
+            xAxis: {
+                type: 'category',
+                axisLabel: { interval: 0, rotate: 20 },
+                data: {{ summary.player_names | tojson }}
+            },
+            yAxis: { type: 'value' },
+            series: [{
+                type: 'bar',
+                data: {{ summary.player_scores | tojson }},
+                itemStyle: { color: '#1769aa', borderRadius: [6, 6, 0, 0] }
+            }]
+        });
+
+        lineChart.setOption({
+            tooltip: { trigger: 'axis' },
+            legend: { top: 0 },
+            grid: { left: 42, right: 24, top: 48, bottom: 36 },
+            xAxis: {
+                type: 'category',
+                data: {{ summary.month_labels | tojson }}
+            },
+            yAxis: [
+                { type: 'value', name: '评分/时长' },
+                { type: 'value', name: '速度评分' }
+            ],
+            series: [
+                {
+                    name: '平均体能评分',
+                    type: 'line',
+                    smooth: true,
+                    data: {{ summary.monthly_scores | tojson }}
+                },
+                {
+                    name: '训练总时长',
+                    type: 'bar',
+                    data: {{ summary.monthly_hours | tojson }}
+                },
+                {
+                    name: '平均速度评分',
+                    type: 'line',
+                    smooth: true,
+                    yAxisIndex: 1,
+                    data: {{ summary.monthly_speed | tojson }}
+                }
+            ]
+        });
+
+        window.addEventListener('resize', function () {
+            pieChart.resize();
+            barChart.resize();
+            lineChart.resize();
+        });
+    });
+</script>
+{% endblock %}
