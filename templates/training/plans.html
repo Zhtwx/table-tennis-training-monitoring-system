@@ -1,0 +1,238 @@
+{% extends "base.html" %}
+
+{% block title %}训练计划管理 - 乒乓球运动员综合训练监控管理系统{% endblock %}
+
+{% block content %}
+<div class="d-flex flex-column flex-md-row align-items-md-center justify-content-between gap-3 mb-4">
+    <div>
+        <h1 class="page-title h3 mb-1">训练计划管理</h1>
+        <p class="text-secondary mb-0">发布、编辑、删除训练计划，支持按运动员姓名、日期范围、内容关键词查询。</p>
+    </div>
+    <div class="d-flex gap-2">
+        <button class="btn btn-success" data-bs-toggle="modal" data-bs-target="#importModal">
+            📥 导入 Excel
+        </button>
+        <button class="btn btn-primary" data-bs-toggle="modal" data-bs-target="#planModal" onclick="resetForm()">
+            + 新增计划
+        </button>
+    </div>
+</div>
+
+<!-- 查询表单 -->
+<div class="card shadow-sm mb-4">
+    <div class="card-header bg-white border-0 pt-4 px-4">
+        <h2 class="h5 mb-1">查询条件</h2>
+    </div>
+    <div class="card-body">
+        <form method="get" action="{{ url_for('training.plans') }}" class="row g-3">
+            <div class="col-12 col-md-3">
+                <label for="athlete_name" class="form-label">运动员姓名</label>
+                <input type="text" class="form-control" id="athlete_name" name="athlete_name"
+                       value="{{ athlete_name }}" placeholder="如：王一鸣">
+            </div>
+            <div class="col-12 col-md-3">
+                <label for="start_date" class="form-label">起始日期（仅日期）</label>
+                <input type="date" class="form-control" id="start_date" name="start_date" value="{{ start_date }}">
+            </div>
+            <div class="col-12 col-md-3">
+                <label for="end_date" class="form-label">结束日期（仅日期）</label>
+                <input type="date" class="form-control" id="end_date" name="end_date" value="{{ end_date }}">
+            </div>
+            <div class="col-12 col-md-3">
+                <label for="content" class="form-label">内容关键词</label>
+                <input type="text" class="form-control" id="content" name="content" value="{{ content }}" placeholder="如：正手">
+            </div>
+            <div class="col-12 d-flex gap-2">
+                <button type="submit" class="btn btn-primary">查询</button>
+                <a href="{{ url_for('training.plans') }}" class="btn btn-outline-secondary">重置</a>
+            </div>
+        </form>
+    </div>
+</div>
+
+<!-- 计划列表 -->
+<div class="card shadow-sm">
+    <div class="card-header bg-white border-0 pt-4 px-4 d-flex justify-content-between align-items-center">
+        <div>
+            <h2 class="h5 mb-1">计划列表</h2>
+            <p class="text-secondary small mb-0">共 {{ plans|length }} 条计划</p>
+        </div>
+        <a href="{{ url_for('training.export_plans') }}" class="btn btn-success btn-sm">
+            📥 导出 Excel
+        </a>
+    </div>
+    <div class="card-body">
+        <div class="table-responsive">
+            <table class="table table-hover align-middle">
+                <thead class="table-light">
+                    <tr>
+                        <th>ID</th>
+                        <th>运动员</th>
+                        <th>教练</th>
+                        <th>计划时间</th>
+                        <th>内容</th>
+                        <th>强度</th>
+                        <th>时长(分)</th>
+                        <th>地点</th>
+                        <th class="text-end">操作</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for plan in plans %}
+                    <tr>
+                        <td>{{ plan.id }}</td>
+                        <td>{{ plan.athlete_name }}</td>
+                        <td>{{ plan.coach_name }}</td>
+                        <td>{{ plan.plan_datetime }}</td>
+                        <td>{{ plan.content }}</td>
+                        <td>
+                            <span class="badge 
+                                {% if plan.intensity == '高' %}text-bg-danger
+                                {% elif plan.intensity == '极高' %}text-bg-dark
+                                {% elif plan.intensity == '中' %}text-bg-warning
+                                {% else %}text-bg-secondary{% endif %}">
+                                {{ plan.intensity }}
+                            </span>
+                        </td>
+                        <td>{{ plan.duration }}</td>
+                        <td>{{ plan.location or '-' }}</td>
+                        <td class="text-end">
+                            <a href="{{ url_for('training.edit_plan', plan_id=plan.id) }}" class="btn btn-sm btn-outline-primary">编辑</a>
+                            <form method="post" action="{{ url_for('training.delete_plan', plan_id=plan.id) }}" style="display:inline-block;" onsubmit="return confirm('确认删除该计划？');">
+                                <button type="submit" class="btn btn-sm btn-outline-danger">删除</button>
+                            </form>
+                        </td>
+                    </tr>
+                    {% else %}
+                    <tr>
+                        <td colspan="9" class="text-center text-secondary py-5">暂无训练计划，请新增</td>
+                    </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+    </div>
+</div>
+
+<!-- 新增模态框 -->
+<div class="modal fade" id="planModal" tabindex="-1" aria-labelledby="planModalLabel" aria-hidden="true">
+    <div class="modal-dialog modal-dialog-centered modal-lg">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h2 class="modal-title fs-5" id="planModalLabel">新增训练计划</h2>
+                <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="关闭"></button>
+            </div>
+            <form method="post" action="{{ url_for('training.plans') }}">
+                <div class="modal-body">
+                    <div class="row g-3">
+                        <div class="col-md-6">
+                            <label for="athlete_id" class="form-label">运动员</label>
+                            <select class="form-select" id="athlete_id" name="athlete_id" required>
+                                <option value="">请选择</option>
+                                {% for athlete in athletes %}
+                                <option value="{{ athlete.id }}">{{ athlete.name }}</option>
+                                {% endfor %}
+                            </select>
+                        </div>
+                        <div class="col-md-6">
+                            <label for="coach_id" class="form-label">教练</label>
+                            <select class="form-select" id="coach_id" name="coach_id">
+                                <option value="">请选择</option>
+                                {% for coach in coaches %}
+                                <option value="{{ coach.id }}">{{ coach.name }}</option>
+                                {% endfor %}
+                            </select>
+                            <small class="text-muted">可选</small>
+                        </div>
+                        <div class="col-md-6">
+                            <label for="plan_datetime" class="form-label">计划时间（精确到分钟）</label>
+                            <input type="datetime-local" class="form-control" id="plan_datetime" name="plan_datetime" required>
+                        </div>
+                        <div class="col-md-6">
+                            <label for="intensity" class="form-label">强度</label>
+                            <select class="form-select" id="intensity" name="intensity">
+                                <option value="低">低</option>
+                                <option value="中" selected>中</option>
+                                <option value="高">高</option>
+                                <option value="极高">极高</option>
+                            </select>
+                        </div>
+                        <div class="col-md-6">
+                            <label for="duration" class="form-label">时长（分钟）</label>
+                            <input type="number" class="form-control" id="duration" name="duration" value="60" min="1">
+                        </div>
+                        <div class="col-md-6">
+                            <label for="location" class="form-label">地点</label>
+                            <input type="text" class="form-control" id="location" name="location" placeholder="训练馆A">
+                        </div>
+                        <div class="col-12">
+                            <label for="content" class="form-label">训练内容</label>
+                            <textarea class="form-control" id="content" name="content" rows="3" required></textarea>
+                        </div>
+                    </div>
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">取消</button>
+                    <button type="submit" class="btn btn-primary">保存</button>
+                </div>
+            </form>
+        </div>
+    </div>
+</div>
+
+<!-- 导入 Excel 模态框 -->
+<div class="modal fade" id="importModal" tabindex="-1" aria-labelledby="importModalLabel" aria-hidden="true">
+    <div class="modal-dialog modal-dialog-centered">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h2 class="modal-title fs-5" id="importModalLabel">导入训练计划（Excel）</h2>
+                <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="关闭"></button>
+            </div>
+            <form method="post" action="{{ url_for('training.import_excel') }}" enctype="multipart/form-data">
+                <div class="modal-body">
+                    <div class="mb-3">
+                        <label for="training_excel" class="form-label">选择 Excel 文件（.xlsx 或 .xls）</label>
+                        <input class="form-control" type="file" id="training_excel" name="training_excel" accept=".xls,.xlsx" required>
+                        <div class="form-text">
+                            表头必须包含：运动员、教练、计划时间、内容、强度、时长(分钟)、地点<br>
+                            计划时间格式：<code>YYYY-MM-DD HH:MM</code>（例如 2026-07-18 14:30）
+                        </div>
+                    </div>
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">取消</button>
+                    <button type="submit" class="btn btn-success">上传并导入</button>
+                </div>
+            </form>
+        </div>
+    </div>
+</div>
+
+{% endblock %}
+
+{% block scripts %}
+<script src="https://cdn.jsdelivr.net/npm/sweetalert2@11"></script>
+<script>
+    
+    // 处理服务器返回的 flash 错误（转为弹窗）
+    window.addEventListener('load', function() {
+        const flashMessages = document.querySelectorAll('.alert-danger');
+        flashMessages.forEach(function(alert) {
+            const msg = alert.innerText.trim();
+            if (msg) {
+                Swal.fire({
+                    icon: 'error',
+                    title: '提交失败',
+                    text: msg,
+                    confirmButtonColor: '#1769aa'
+                });
+                alert.remove();
+            }
+        });
+    });
+
+    function resetForm() {
+        // 重置新增表单（由模态框自动处理）
+    }
+</script>
+{% endblock %}
