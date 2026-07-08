@@ -6,39 +6,50 @@
 <div class="d-flex flex-column flex-md-row align-items-md-center justify-content-between gap-3 mb-4">
     <div>
         <h1 class="page-title h3 mb-1">运动员档案</h1>
-        <p class="text-secondary mb-0">支持学号、姓名、等级、打法、伤病状态、年龄范围等多条件模糊组合查询。</p>
+        <p class="text-secondary mb-0">支持学号、姓名、性别、运动等级、打法、握拍方式、伤病状态、年龄范围等 8 个维度的多条件动态组合查询。</p>
     </div>
     {% if current_user.role == 'admin' %}
-        <a href="{{ url_for('players.create') }}" class="btn btn-primary shadow-sm">新增运动员</a>
+        <a href="{{ url_for('players.create') }}" class="btn btn-primary shadow-sm">
+            <i class="bi bi-plus-lg"></i> 新增运动员
+        </a>
     {% endif %}
 </div>
 
+<!-- ============================================================ -->
+<!-- 多条件动态组合查询面板                                        -->
+<!-- 设计说明：                                                    -->
+<!--   1. 8 个筛选维度以表单形式排列，网格布局响应式适配            -->
+<!--   2. 文本类字段（学号/姓名/打法/握拍）使用模糊匹配 LIKE       -->
+<!--   3. 枚举类字段（性别/等级/伤病）使用下拉框精确匹配            -->
+<!--   4. 数值范围字段（年龄）通过 birth_date 计算列筛选            -->
+<!--   5. 条件逻辑 AND/OR 可切换                                    -->
+<!--   6. 查询参数通过 URL query string 传递，支持浏览器收藏夹      -->
+<!-- ============================================================ -->
 <div class="card shadow-sm mb-4">
     <div class="card-header bg-white border-0 pt-4 px-4">
-        <h2 class="h5 mb-1">多条件模糊组合查询</h2>
-        <p class="text-secondary small mb-0">可任意填写多个条件；文本类条件支持模糊匹配；条件逻辑默认 AND，也可切换为 OR。</p>
+        <h2 class="h5 mb-1">多条件动态组合查询</h2>
+        <p class="text-secondary small mb-0">
+            可任意填写多个条件；文本类条件支持模糊匹配；条件逻辑默认 <strong>AND（同时满足）</strong>，也可切换为 <strong>OR（任一满足）</strong>。
+        </p>
     </div>
     <div class="card-body">
         <form class="row g-3 align-items-end" method="get" action="{{ url_for('players.list') }}">
-            <div class="col-12 col-md-3">
+            <!-- 学号 - 模糊匹配 -->
+            <div class="col-12 col-md-4 col-lg-3">
                 <label for="student_no" class="form-label">学号 / 编号</label>
                 <input type="text" class="form-control" id="student_no" name="student_no"
-                       value="{{ request.args.get('student_no', '') }}" placeholder="例如：2026">
+                       value="{{ request.args.get('student_no', '') }}" placeholder="例如：2026（支持模糊）">
             </div>
 
-            <div class="col-12 col-md-3">
+            <!-- 姓名 - 模糊匹配 -->
+            <div class="col-12 col-md-4 col-lg-3">
                 <label for="name" class="form-label">姓名</label>
                 <input type="text" class="form-control" id="name" name="name"
-                       value="{{ request.args.get('name', '') }}" placeholder="例如：王、清">
+                       value="{{ request.args.get('name', '') }}" placeholder="例如：王、清扬（支持模糊）">
             </div>
 
-            <div class="col-12 col-md-3">
-                <label for="play_style" class="form-label">打法关键词</label>
-                <input type="text" class="form-control" id="play_style" name="play_style"
-                       value="{{ request.args.get('play_style', '') }}" placeholder="例如：横板、弧圈、快攻">
-            </div>
-
-            <div class="col-12 col-md-3">
+            <!-- 性别 - 精确匹配 -->
+            <div class="col-6 col-md-4 col-lg-2">
                 <label for="gender" class="form-label">性别</label>
                 <select class="form-select" id="gender" name="gender">
                     <option value="">不限</option>
@@ -47,66 +58,92 @@
                 </select>
             </div>
 
-            <div class="col-12 col-md-3">
-                <label for="level" class="form-label">运动等级</label>
-                <select class="form-select" id="level" name="level">
+            <!-- 运动等级 - 精确匹配 -->
+            <div class="col-6 col-md-4 col-lg-2">
+                <label for="skill_level" class="form-label">运动等级</label>
+                <select class="form-select" id="skill_level" name="skill_level">
                     <option value="">不限</option>
-                    <option value="national" {% if request.args.get('level') == 'national' %}selected{% endif %}>国家级</option>
-                    <option value="first" {% if request.args.get('level') == 'first' %}selected{% endif %}>一级运动员</option>
-                    <option value="second" {% if request.args.get('level') == 'second' %}selected{% endif %}>二级运动员</option>
-                    <option value="youth" {% if request.args.get('level') == 'youth' %}selected{% endif %}>青年队</option>
+                    {% for code, label in skill_level_choices %}
+                    <option value="{{ code }}" {% if request.args.get('skill_level') == code %}selected{% endif %}>{{ label }}</option>
+                    {% endfor %}
                 </select>
             </div>
 
-            <div class="col-12 col-md-3">
+            <!-- 伤病状态 - 精确匹配 -->
+            <div class="col-6 col-md-4 col-lg-2">
                 <label for="injury_status" class="form-label">伤病状态</label>
                 <select class="form-select" id="injury_status" name="injury_status">
                     <option value="">不限</option>
-                    <option value="healthy" {% if request.args.get('injury_status') == 'healthy' %}selected{% endif %}>健康</option>
-                    <option value="observe" {% if request.args.get('injury_status') == 'observe' %}selected{% endif %}>观察中</option>
-                    <option value="injured" {% if request.args.get('injury_status') == 'injured' %}selected{% endif %}>伤病中</option>
-                    <option value="rehab" {% if request.args.get('injury_status') == 'rehab' %}selected{% endif %}>康复中</option>
+                    {% for code, label in injury_status_choices %}
+                    <option value="{{ code }}" {% if request.args.get('injury_status') == code %}selected{% endif %}>{{ label }}</option>
+                    {% endfor %}
                 </select>
             </div>
 
+            <!-- 打法关键词 - 模糊匹配 -->
+            <div class="col-12 col-md-4 col-lg-3">
+                <label for="play_style" class="form-label">打法关键词</label>
+                <input type="text" class="form-control" id="play_style" name="play_style"
+                       value="{{ request.args.get('play_style', '') }}" placeholder="例如：横板、弧圈、快攻">
+            </div>
+
+            <!-- 握拍方式 - 模糊匹配 -->
+            <div class="col-12 col-md-4 col-lg-3">
+                <label for="grip" class="form-label">握拍方式</label>
+                <input type="text" class="form-control" id="grip" name="grip"
+                       value="{{ request.args.get('grip', '') }}" placeholder="例如：右手横板、左手直板">
+            </div>
+
+            <!-- 年龄范围 - birth_date 计算列筛选 -->
             <div class="col-6 col-md-2">
                 <label for="age_min" class="form-label">最小年龄</label>
-                <input type="number" class="form-control" id="age_min" name="age_min" min="0"
-                       value="{{ request.args.get('age_min', '') }}" placeholder="18">
+                <input type="number" class="form-control" id="age_min" name="age_min" min="10" max="80"
+                       value="{{ request.args.get('age_min', '') }}" placeholder="例如：18">
             </div>
 
             <div class="col-6 col-md-2">
                 <label for="age_max" class="form-label">最大年龄</label>
-                <input type="number" class="form-control" id="age_max" name="age_max" min="0"
-                       value="{{ request.args.get('age_max', '') }}" placeholder="22">
+                <input type="number" class="form-control" id="age_max" name="age_max" min="10" max="80"
+                       value="{{ request.args.get('age_max', '') }}" placeholder="例如：22">
             </div>
 
-            <div class="col-12 col-md-2">
+            <!-- 条件逻辑切换 -->
+            <div class="col-6 col-md-2">
                 <label for="logic" class="form-label">条件逻辑</label>
                 <select class="form-select" id="logic" name="logic">
-                    <option value="and" {% if logic != 'or' %}selected{% endif %}>AND 同时满足</option>
-                    <option value="or" {% if logic == 'or' %}selected{% endif %}>OR 任一满足</option>
+                    <option value="and" {% if logic != 'OR' %}selected{% endif %}>AND 同时满足</option>
+                    <option value="or" {% if logic == 'OR' %}selected{% endif %}>OR 任一满足</option>
                 </select>
             </div>
 
-            <div class="col-12 col-md-2 d-grid">
-                <button type="submit" class="btn btn-primary">组合查询</button>
+            <!-- 操作按钮 -->
+            <div class="col-6 col-md-3 col-lg-2 d-grid">
+                <button type="submit" class="btn btn-primary">
+                    <i class="bi bi-search"></i> 组合查询
+                </button>
             </div>
 
-            <div class="col-12 col-md-2 d-grid">
+            <div class="col-6 col-md-3 col-lg-2 d-grid">
                 <a href="{{ url_for('players.list') }}" class="btn btn-outline-secondary">重置条件</a>
             </div>
         </form>
     </div>
 </div>
 
+<!-- ============================================================ -->
+<!-- 运动员列表                                                   -->
+<!-- 设计说明：                                                    -->
+<!--   - 年龄通过后端 calculate_age(birth_date) 计算               -->
+<!--   - 伤病状态以 Bootstrap 彩色徽章展示                          -->
+<!--   - admin 角色可编辑/删除，coach 角色仅可查看                  -->
+<!-- ============================================================ -->
 <div class="card shadow-sm">
     <div class="card-header bg-white border-0 pt-4 px-4 d-flex flex-column flex-md-row justify-content-between gap-2">
         <div>
             <h2 class="h5 mb-1">运动员列表</h2>
             <p class="text-secondary small mb-0">
-                当前命中 {{ players|length }} 条，共 {{ total_count }} 条；
-                已启用 {{ active_condition_count }} 个查询条件，逻辑为 {{ 'OR' if logic == 'or' else 'AND' }}。
+                当前命中 <strong>{{ players|length }}</strong> 条，共 <strong>{{ total_count }}</strong> 条；
+                已启用 <strong>{{ active_condition_count }}</strong> 个查询条件，逻辑为 <strong>{{ 'OR（任一满足）' if logic == 'OR' else 'AND（同时满足）' }}</strong>。
             </p>
         </div>
     </div>
@@ -116,12 +153,13 @@
             <table class="table table-hover align-middle">
                 <thead class="table-light">
                     <tr>
-                        <th scope="col">学号</th>
+                        <th scope="col" style="width: 100px;">学号</th>
                         <th scope="col">姓名</th>
                         <th scope="col">性别</th>
                         <th scope="col">年龄</th>
                         <th scope="col">运动等级</th>
                         <th scope="col">主打法</th>
+                        <th scope="col">握拍</th>
                         <th scope="col">伤病状态</th>
                         <th scope="col" class="text-end">操作</th>
                     </tr>
@@ -129,36 +167,50 @@
                 <tbody>
                     {% for player in players %}
                     <tr>
-                        <td>{{ player.student_no }}</td>
-                        <td class="fw-semibold">{{ player.name }}</td>
+                        <td><code>{{ player.student_no }}</code></td>
+                        <td>
+                            <a href="{{ url_for('players.detail', player_id=player.id) }}" class="fw-semibold text-decoration-none">
+                                {{ player.name }}
+                            </a>
+                        </td>
                         <td>{{ player.gender }}</td>
                         <td>{{ player.age }}</td>
-                        <td>{{ player.level }}</td>
-                        <td>{{ player.play_style }}</td>
+                        <td><span class="badge text-bg-light">{{ player.skill_level }}</span></td>
+                        <td>{{ player.play_style or '-' }}</td>
+                        <td>{{ player.grip or '-' }}</td>
                         <td>
-                            {% if player.injury_status_code == 'healthy' %}
+                            {% if player.injury_status == '健康' %}
                                 <span class="badge text-bg-success">{{ player.injury_status }}</span>
-                            {% elif player.injury_status_code == 'observe' %}
+                            {% elif player.injury_status == '观察中' %}
                                 <span class="badge text-bg-warning">{{ player.injury_status }}</span>
-                            {% elif player.injury_status_code == 'injured' %}
+                            {% elif player.injury_status == '伤病中' %}
                                 <span class="badge text-bg-danger">{{ player.injury_status }}</span>
-                            {% else %}
+                            {% elif player.injury_status == '康复中' %}
                                 <span class="badge text-bg-info">{{ player.injury_status }}</span>
+                            {% else %}
+                                <span class="badge text-bg-secondary">{{ player.injury_status }}</span>
                             {% endif %}
                         </td>
-                        <td class="text-end">
+                        <td class="text-end text-nowrap">
+                            <a href="{{ url_for('players.detail', player_id=player.id) }}"
+                               class="btn btn-sm btn-outline-secondary" title="查看详情">详情</a>
                             {% if current_user.role == 'admin' %}
-                                <a href="{{ url_for('players.edit', player_id=player.id) }}" class="btn btn-sm btn-outline-primary">编辑</a>
-                                <button type="button" class="btn btn-sm btn-outline-danger" data-bs-toggle="modal" data-bs-target="#deletePlayerModal">
-                                    删除
-                                </button>
+                                <a href="{{ url_for('players.edit', player_id=player.id) }}"
+                                   class="btn btn-sm btn-outline-primary" title="编辑档案">编辑</a>
+                                <button type="button" class="btn btn-sm btn-outline-danger"
+                                        data-bs-toggle="modal" data-bs-target="#deleteModal"
+                                        data-player-id="{{ player.id }}"
+                                        data-player-name="{{ player.name }}"
+                                        title="删除运动员">删除</button>
                             {% endif %}
-                            <a href="{{ url_for('injuries.history', player_id=player.id) }}" class="btn btn-sm btn-outline-secondary">伤病历史</a>
                         </td>
                     </tr>
                     {% else %}
                     <tr>
-                        <td colspan="8" class="text-center text-secondary py-5">未找到符合条件的运动员，请调整查询条件。</td>
+                        <td colspan="9" class="text-center text-secondary py-5">
+                            <i class="bi bi-inbox" style="font-size: 2rem;"></i>
+                            <p class="mt-2 mb-0">未找到符合条件的运动员，请调整查询条件后重试。</p>
+                        </td>
                     </tr>
                     {% endfor %}
                 </tbody>
@@ -167,21 +219,59 @@
     </div>
 </div>
 
-<div class="modal fade" id="deletePlayerModal" tabindex="-1" aria-labelledby="deletePlayerModalLabel" aria-hidden="true">
+<!-- ============================================================ -->
+<!-- 删除确认弹窗                                                  -->
+<!-- 说明：                                                        -->
+<!--   - 使用 Bootstrap Modal 实现二次确认                         -->
+<!--   - 通过 data-* 属性动态传递运动员 ID 和姓名                   -->
+<!--   - 提交表单到 DELETE 路由执行实际删除                         -->
+<!-- ============================================================ -->
+{% if current_user.role == 'admin' %}
+<div class="modal fade" id="deleteModal" tabindex="-1" aria-labelledby="deleteModalLabel" aria-hidden="true">
     <div class="modal-dialog modal-dialog-centered">
         <div class="modal-content">
-            <div class="modal-header">
-                <h2 class="modal-title fs-5" id="deletePlayerModalLabel">确认删除运动员</h2>
-                <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="关闭"></button>
+            <div class="modal-header bg-danger text-white">
+                <h2 class="modal-title fs-5" id="deleteModalLabel">
+                    <i class="bi bi-exclamation-triangle"></i> 确认删除运动员
+                </h2>
+                <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal" aria-label="关闭"></button>
             </div>
             <div class="modal-body">
-                删除后，该运动员将不再出现在当前档案列表中。历史训练、伤病和比赛记录建议保留归档。
+                <p>您确定要删除运动员 <strong id="deletePlayerName">-</strong> 吗？</p>
+                <p class="text-danger small mb-0">
+                    <i class="bi bi-info-circle"></i>
+                    此操作将同时删除该运动员关联的所有训练计划、技术记录、体能报告、伤病记录和比赛成绩（数据库外键 CASCADE）。
+                    删除后不可恢复，请谨慎操作。
+                </p>
             </div>
             <div class="modal-footer">
                 <button type="button" class="btn btn-outline-secondary" data-bs-dismiss="modal">取消</button>
-                <button type="button" class="btn btn-danger">确认删除</button>
+                <form id="deleteForm" method="post" style="display:inline;">
+                    <button type="submit" class="btn btn-danger">确认删除</button>
+                </form>
             </div>
         </div>
     </div>
 </div>
+{% endif %}
+{% endblock %}
+
+{% block scripts %}
+<script>
+    // 删除弹窗 - 动态设置运动员 ID 和姓名
+    document.addEventListener('DOMContentLoaded', function () {
+        const deleteModal = document.getElementById('deleteModal');
+        if (!deleteModal) return;
+
+        deleteModal.addEventListener('show.bs.modal', function (event) {
+            const button = event.relatedTarget;
+            const playerId = button.getAttribute('data-player-id');
+            const playerName = button.getAttribute('data-player-name');
+
+            document.getElementById('deletePlayerName').textContent = playerName;
+            document.getElementById('deleteForm').action =
+                "{{ url_for('players.delete', player_id=0) }}".replace('0', playerId);
+        });
+    });
+</script>
 {% endblock %}
