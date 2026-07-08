@@ -1,0 +1,339 @@
+{% extends "base.html" %}
+
+{% block title %}伤病记录模块 - 乒乓球运动员综合训练监控管理系统{% endblock %}
+
+{% block extra_css %}
+<style>
+    .injury-stat {
+        border-left: 4px solid var(--tt-primary);
+    }
+
+    .form-panel {
+        position: sticky;
+        top: 88px;
+    }
+
+    .chart-box-sm {
+        width: 100%;
+        height: 280px;
+    }
+
+    .timeline-dot {
+        width: .75rem;
+        height: .75rem;
+        border-radius: 999px;
+        display: inline-block;
+        margin-right: .5rem;
+        background: var(--tt-primary);
+    }
+
+    @media (max-width: 991.98px) {
+        .form-panel {
+            position: static;
+        }
+    }
+</style>
+{% endblock %}
+
+{% block content %}
+<div class="d-flex flex-column flex-md-row align-items-md-center justify-content-between gap-3 mb-4">
+    <div>
+        <h1 class="page-title h3 mb-1">伤病记录模块</h1>
+        <p class="text-secondary mb-0">完成伤病登记、历史追溯、健康状态联动刷新与异常数据拦截。</p>
+    </div>
+    <a href="{{ url_for('players.list') }}" class="btn btn-outline-secondary">查看运动员档案</a>
+</div>
+
+<div class="row g-3 mb-4">
+    <div class="col-6 col-xl-3">
+        <div class="card shadow-sm injury-stat h-100">
+            <div class="card-body">
+                <div class="text-secondary small">当前记录</div>
+                <div class="fs-3 fw-bold">{{ summary.record_count }}</div>
+            </div>
+        </div>
+    </div>
+    <div class="col-6 col-xl-3">
+        <div class="card shadow-sm injury-stat h-100">
+            <div class="card-body">
+                <div class="text-secondary small">未恢复记录</div>
+                <div class="fs-3 fw-bold text-danger">{{ summary.active_count }}</div>
+            </div>
+        </div>
+    </div>
+    <div class="col-6 col-xl-3">
+        <div class="card shadow-sm injury-stat h-100">
+            <div class="card-body">
+                <div class="text-secondary small">严重伤病</div>
+                <div class="fs-3 fw-bold">{{ summary.serious_count }}</div>
+            </div>
+        </div>
+    </div>
+    <div class="col-6 col-xl-3">
+        <div class="card shadow-sm injury-stat h-100">
+            <div class="card-body">
+                <div class="text-secondary small">逾期未恢复</div>
+                <div class="fs-3 fw-bold text-warning">{{ summary.overdue_count }}</div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<div class="card shadow-sm mb-4">
+    <div class="card-header bg-white border-0 pt-4 px-4">
+        <h2 class="h5 mb-1">伤病记录查询</h2>
+    </div>
+    <div class="card-body">
+        <form class="row g-3 align-items-end" method="get" action="{{ url_for('injuries.list') }}">
+            <div class="col-12 col-md-3">
+                <label for="player_keyword" class="form-label">运动员关键词</label>
+                <input type="text" class="form-control" id="player_keyword" name="player_keyword"
+                       value="{{ request.args.get('player_keyword', '') }}" placeholder="姓名或学号">
+            </div>
+            <div class="col-12 col-md-3">
+                <label for="location_keyword" class="form-label">伤病关键词</label>
+                <input type="text" class="form-control" id="location_keyword" name="location_keyword"
+                       value="{{ request.args.get('location_keyword', '') }}" placeholder="部位或类型">
+            </div>
+            <div class="col-6 col-md-2">
+                <label for="severity" class="form-label">伤病程度</label>
+                <select class="form-select" id="severity" name="severity">
+                    <option value="">不限</option>
+                    {% for severity in severity_options %}
+                        <option value="{{ severity }}" {% if request.args.get('severity') == severity %}selected{% endif %}>{{ severity }}</option>
+                    {% endfor %}
+                </select>
+            </div>
+            <div class="col-6 col-md-2">
+                <label for="recovery_status" class="form-label">恢复状态</label>
+                <select class="form-select" id="recovery_status" name="recovery_status">
+                    <option value="">不限</option>
+                    {% for status in recovery_status_options %}
+                        <option value="{{ status }}" {% if request.args.get('recovery_status') == status %}selected{% endif %}>{{ status }}</option>
+                    {% endfor %}
+                </select>
+            </div>
+            <div class="col-6 col-md-2">
+                <label for="date_from" class="form-label">开始日期</label>
+                <input type="date" class="form-control" id="date_from" name="date_from" value="{{ request.args.get('date_from', '') }}">
+            </div>
+            <div class="col-6 col-md-2">
+                <label for="date_to" class="form-label">结束日期</label>
+                <input type="date" class="form-control" id="date_to" name="date_to" value="{{ request.args.get('date_to', '') }}">
+            </div>
+            <div class="col-12 col-md-2">
+                <div class="form-check">
+                    <input class="form-check-input" type="checkbox" id="active_only" name="active_only" value="1"
+                           {% if request.args.get('active_only') %}checked{% endif %}>
+                    <label class="form-check-label" for="active_only">只看未恢复</label>
+                </div>
+            </div>
+            <div class="col-6 col-md-2 d-grid">
+                <button type="submit" class="btn btn-primary">执行查询</button>
+            </div>
+            <div class="col-6 col-md-2 d-grid">
+                <a href="{{ url_for('injuries.list') }}" class="btn btn-outline-secondary">重置条件</a>
+            </div>
+        </form>
+        <div class="mt-3 text-secondary small">
+            当前命中 {{ injury_records|length }} 条记录，共 {{ total_count }} 条，启用 {{ active_condition_count }} 个查询条件。
+        </div>
+    </div>
+</div>
+
+<div class="row g-4">
+    <div class="col-12 col-xl-8">
+        <div class="card shadow-sm mb-4">
+            <div class="card-header bg-white border-0 pt-4 px-4">
+                <h2 class="h5 mb-1">统计概览</h2>
+            </div>
+            <div class="card-body">
+                <div class="row g-4">
+                    <div class="col-12 col-lg-6">
+                        <div id="injuryStatusChart" class="chart-box-sm"></div>
+                    </div>
+                    <div class="col-12 col-lg-6">
+                        <div id="injuryLocationChart" class="chart-box-sm"></div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <div class="card shadow-sm">
+            <div class="card-header bg-white border-0 pt-4 px-4">
+                <h2 class="h5 mb-1">伤病记录列表</h2>
+            </div>
+            <div class="card-body">
+                <div class="table-responsive">
+                    <table class="table table-hover align-middle">
+                        <thead class="table-light">
+                            <tr>
+                                <th>日期</th>
+                                <th>运动员</th>
+                                <th>部位 / 类型</th>
+                                <th>程度</th>
+                                <th>恢复状态</th>
+                                <th>预计恢复</th>
+                                <th class="text-end">操作</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            {% for record in injury_records %}
+                            <tr>
+                                <td class="text-nowrap">{{ record.injury_date }}</td>
+                                <td>
+                                    <div class="fw-semibold">{{ record.player_name }}</div>
+                                    <div class="text-secondary small">{{ record.student_no }} · {{ record.level }}</div>
+                                </td>
+                                <td>
+                                    <div>{{ record.injury_location }}</div>
+                                    <div class="text-secondary small">{{ record.injury_type }}</div>
+                                </td>
+                                <td><span class="badge text-bg-{{ record.severity_class }}">{{ record.severity }}</span></td>
+                                <td>
+                                    <span class="badge text-bg-{{ record.recovery_class }}">{{ record.recovery_status }}</span>
+                                    {% if record.is_overdue %}
+                                        <span class="badge text-bg-warning ms-1">逾期</span>
+                                    {% endif %}
+                                </td>
+                                <td class="text-nowrap">{{ record.expected_recovery_date or '-' }}</td>
+                                <td class="text-end text-nowrap">
+                                    <a href="{{ url_for('injuries.list', edit_id=record.id) }}" class="btn btn-sm btn-outline-primary">修改</a>
+                                    <a href="{{ url_for('injuries.history', player_id=record.athlete_id) }}" class="btn btn-sm btn-outline-secondary">历史</a>
+                                </td>
+                            </tr>
+                            {% else %}
+                            <tr>
+                                <td colspan="7" class="text-center text-secondary py-5">暂无符合条件的伤病记录。</td>
+                            </tr>
+                            {% endfor %}
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <div class="col-12 col-xl-4">
+        <div class="card shadow-sm form-panel">
+            <div class="card-header bg-white border-0 pt-4 px-4">
+                <h2 class="h5 mb-1">{% if editing_record %}修改伤病记录{% else %}新增伤病登记{% endif %}</h2>
+            </div>
+            <div class="card-body">
+                <form method="post" action="{{ url_for('injuries.list') }}" class="row g-3">
+                    <input type="hidden" name="record_id" value="{{ editing_record.id if editing_record else '' }}">
+                    <div class="col-12">
+                        <label for="athlete_id" class="form-label">运动员</label>
+                        <select class="form-select" id="athlete_id" name="athlete_id" required>
+                            <option value="">请选择运动员</option>
+                            {% for player in athlete_choices %}
+                                <option value="{{ player.id }}" {% if editing_record and editing_record.athlete_id == player.id %}selected{% endif %}>
+                                    {{ player.student_no }} - {{ player.name }}（{{ player.injury_status }}）
+                                </option>
+                            {% endfor %}
+                        </select>
+                    </div>
+                    <div class="col-12">
+                        <label for="injury_date" class="form-label">伤病日期</label>
+                        <input type="date" class="form-control" id="injury_date" name="injury_date"
+                               value="{{ editing_record.injury_date if editing_record else '' }}" required>
+                    </div>
+                    <div class="col-6">
+                        <label for="injury_location" class="form-label">伤病部位</label>
+                        <input type="text" class="form-control" id="injury_location" name="injury_location"
+                               maxlength="50" value="{{ editing_record.injury_location if editing_record else '' }}" required>
+                    </div>
+                    <div class="col-6">
+                        <label for="injury_type" class="form-label">伤病类型</label>
+                        <input type="text" class="form-control" id="injury_type" name="injury_type"
+                               maxlength="50" value="{{ editing_record.injury_type if editing_record else '' }}" required>
+                    </div>
+                    <div class="col-6">
+                        <label for="severity_form" class="form-label">伤病程度</label>
+                        <select class="form-select" id="severity_form" name="severity" required>
+                            {% for severity in severity_options %}
+                                <option value="{{ severity }}" {% if editing_record and editing_record.severity == severity %}selected{% endif %}>{{ severity }}</option>
+                            {% endfor %}
+                        </select>
+                    </div>
+                    <div class="col-6">
+                        <label for="recovery_status_form" class="form-label">恢复状态</label>
+                        <select class="form-select" id="recovery_status_form" name="recovery_status" required>
+                            {% for status in recovery_status_options %}
+                                <option value="{{ status }}" {% if editing_record and editing_record.recovery_status == status %}selected{% endif %}>{{ status }}</option>
+                            {% endfor %}
+                        </select>
+                    </div>
+                    <div class="col-12">
+                        <label for="expected_recovery_date" class="form-label">预计恢复日期</label>
+                        <input type="date" class="form-control" id="expected_recovery_date" name="expected_recovery_date"
+                               value="{{ editing_record.expected_recovery_date if editing_record else '' }}">
+                    </div>
+                    <div class="col-12">
+                        <label for="diagnosis" class="form-label">诊断说明</label>
+                        <textarea class="form-control" id="diagnosis" name="diagnosis" rows="2" maxlength="180">{{ editing_record.diagnosis if editing_record else '' }}</textarea>
+                    </div>
+                    <div class="col-12">
+                        <label for="treatment" class="form-label">处理方案</label>
+                        <textarea class="form-control" id="treatment" name="treatment" rows="2" maxlength="180">{{ editing_record.treatment if editing_record else '' }}</textarea>
+                    </div>
+                    <div class="col-12">
+                        <label for="notes" class="form-label">备注</label>
+                        <textarea class="form-control" id="notes" name="notes" rows="2" maxlength="120">{{ editing_record.notes if editing_record else '' }}</textarea>
+                    </div>
+                    <div class="col-12 d-grid">
+                        <button type="submit" class="btn btn-primary">{% if editing_record %}保存修改{% else %}提交登记{% endif %}</button>
+                    </div>
+                    {% if editing_record %}
+                        <div class="col-12 d-grid">
+                            <a href="{{ url_for('injuries.list') }}" class="btn btn-outline-secondary">取消编辑</a>
+                        </div>
+                    {% endif %}
+                </form>
+            </div>
+            <div class="card-footer bg-light text-secondary small">
+                保存后会按治疗中严重、治疗中、康复中、已恢复的优先级刷新运动员健康状态。
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+    document.addEventListener('DOMContentLoaded', function () {
+        const statusChart = echarts.init(document.getElementById('injuryStatusChart'));
+        const locationChart = echarts.init(document.getElementById('injuryLocationChart'));
+
+        statusChart.setOption({
+            tooltip: { trigger: 'item' },
+            legend: { bottom: 0 },
+            series: [{
+                name: '恢复状态',
+                type: 'pie',
+                radius: ['42%', '68%'],
+                center: ['50%', '42%'],
+                data: {{ summary.status_pie | tojson }}
+            }]
+        });
+
+        locationChart.setOption({
+            tooltip: { trigger: 'axis' },
+            grid: { left: 40, right: 18, top: 24, bottom: 44 },
+            xAxis: { type: 'category', data: {{ summary.location_names | tojson }} },
+            yAxis: { type: 'value', minInterval: 1 },
+            series: [{
+                name: '记录数',
+                type: 'bar',
+                data: {{ summary.location_counts | tojson }},
+                itemStyle: { color: '#1769aa' }
+            }]
+        });
+
+        window.addEventListener('resize', function () {
+            statusChart.resize();
+            locationChart.resize();
+        });
+    });
+</script>
+{% endblock %}
