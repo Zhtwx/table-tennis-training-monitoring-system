@@ -8,7 +8,7 @@
         <h1 class="page-title h3 mb-1">专项技术录入</h1>
         <p class="text-secondary mb-0">记录步法、击球、多球训练等专项数据，形成可追踪的技术成长档案。</p>
     </div>
-    <span class="badge text-bg-success align-self-start align-self-md-center">在线录入</span>
+    <a href="/training/training_record">查看训练记录</a>
 </div>
 
 <div class="row g-4">
@@ -104,7 +104,7 @@
                     </div>
 
                     <div class="alert alert-info mb-3" role="alert">
-                        支持字段：运动员编号、训练日期、步法类型、击球技术、多球时长、训练强度、备注。
+                        支持字段：运动员名称、训练日期、步法类型、击球技术、多球时长、训练强度、备注。
                     </div>
 
                     <div class="d-grid">
@@ -121,30 +121,9 @@
             </div>
         </div>
 
-        <button type="button" class="btn btn-outline-warning w-100" data-bs-toggle="modal" data-bs-target="#importErrorModal">
-            查看异常明细
-        </button>
+        
     </div>
 </div>
 
-<div class="modal fade" id="importErrorModal" tabindex="-1" aria-labelledby="importErrorModalLabel" aria-hidden="true">
-    <div class="modal-dialog modal-lg modal-dialog-scrollable">
-        <div class="modal-content">
-            <div class="modal-header">
-                <h2 class="modal-title fs-5" id="importErrorModalLabel">Excel 数据校验结果</h2>
-                <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="关闭"></button>
-            </div>
-            <div class="modal-body">
-                <ul class="list-group">
-                    <li class="list-group-item">第 3 行：运动员编号为空，请补充后重新上传。</li>
-                    <li class="list-group-item">第 8 行：训练强度不在允许范围内。</li>
-                    <li class="list-group-item">第 12 行：训练日期格式错误，建议使用 2026-07-06。</li>
-                </ul>
-            </div>
-            <div class="modal-footer">
-                <button type="button" class="btn btn-primary" data-bs-dismiss="modal">我知道了</button>
-            </div>
-        </div>
-    </div>
-</div>
+
 {% endblock %}

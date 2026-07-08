@@ -29,11 +29,15 @@ USERS = {
     },
 }
 
+# 存储训练记录（临时方案，后续接入数据库）
+TRAINING_RECORDS = []
+
 NAV_ITEMS = [
     {"label": "综合看板", "endpoint": "index", "roles": {"admin", "coach"}},
     {"label": "运动员档案", "endpoint": "players.list", "roles": {"admin", "coach"}},
     {"label": "训练计划", "endpoint": "training.plans", "roles": {"admin", "coach"}},
     {"label": "专项技术录入", "endpoint": "training.batch_import", "roles": {"admin", "coach"}},
+    {"label": "训练记录查看", "endpoint": "training.record", "roles": {"admin", "coach"}},
     {"label": "体能测试", "endpoint": "fitness.tests", "roles": {"admin", "coach"}},
     {"label": "伤病记录", "endpoint": "injuries.list", "roles": {"admin", "coach"}},
     {"label": "康复跟踪", "endpoint": "rehab.list", "roles": {"admin", "coach"}},
@@ -241,19 +245,115 @@ def create_app():
     @training_bp.route("/batch-import", methods=["GET", "POST"], endpoint="batch_import")
     @role_required("admin", "coach")
     def training_batch_import():
+        global TRAINING_RECORDS
         if request.method == "POST":
+            player_id = request.form.get("player_id")
+            athlete_name = next((p["name"] for p in PLAYERS if str(p["id"]) == player_id), "未知")
+            
+            training_date = request.form.get("training_date")
+            footwork_type = request.form.get("footwork_type")
+            stroke_technique = request.form.get("stroke_technique")
+            multi_ball_minutes = request.form.get("multi_ball_minutes")
+            intensity = request.form.get("intensity")
+            training_note = request.form.get("training_note")
+            
+            new_record = {
+                "athlete_name": athlete_name,
+                "training_date": training_date,
+                "footwork_type": footwork_type,
+                "stroke_technique": stroke_technique,
+                "multi_ball_minutes": multi_ball_minutes,
+                "intensity": intensity,
+                "note": training_note
+            }
+            
+            TRAINING_RECORDS.append(new_record)
             flash("训练记录已提交。", "success")
             return redirect(url_for("training.batch_import"))
         return render_template("training/batch_import.html")
 
+    @training_bp.route("/training_record", endpoint="record")
+    @role_required("admin", "coach")
+    def training_record():
+        global TRAINING_RECORDS
+        records = TRAINING_RECORDS
+        
+        # 获取筛选参数
+        athlete_name = request.args.get("athlete_name", "").strip()
+        start_date = request.args.get("start_date", "").strip()
+        end_date = request.args.get("end_date", "").strip()
+        
+        # 按运动员姓名筛选
+        if athlete_name:
+            records = [r for r in records if r.get("athlete_name") == athlete_name]
+        
+        # 按日期范围筛选
+        if start_date:
+            records = [r for r in records if r.get("training_date", "") >= start_date]
+        if end_date:
+            records = [r for r in records if r.get("training_date", "") <= end_date]
+        
+        # 从 TRAINING_RECORDS 中提取所有不重复的运动员姓名
+        all_athletes = sorted(list(set([r.get("athlete_name", "") for r in TRAINING_RECORDS if r.get("athlete_name")])))
+        
+        return render_template(
+            'training/training_record.html', 
+            records=records,
+            all_athletes=all_athletes,
+        )
+
     @training_bp.route("/import-excel", methods=["POST"], endpoint="import_excel")
     @role_required("admin", "coach")
     def training_import_excel():
+        global TRAINING_RECORDS
         file = request.files.get("training_excel")
         if not file:
             flash("请先选择 Excel 文件。", "warning")
+            return redirect(url_for("training.batch_import"))
+        
+        try:
+            import pandas as pd
+            df = pd.read_excel(file)
+        except Exception as e:
+            flash(f"Excel 读取失败：{str(e)}，请检查文件格式。", "danger")
+            return redirect(url_for("training.batch_import"))
+        
+        # 检查必要列是否存在
+        required_columns = ["运动员名称", "训练日期", "步法类型", "击球技术", "多球时长", "训练强度", "备注"]
+        missing_columns = [col for col in required_columns if col not in df.columns]
+        if missing_columns:
+            flash(f"Excel 缺少必要列：{', '.join(missing_columns)}，请检查表头。", "danger")
+            return redirect(url_for("training.batch_import"))
+        
+        imported_count = 0
+        error_rows = []
+        
+        for index, row in df.iterrows():
+            try:
+                if pd.isna(row["运动员名称"]) or pd.isna(row["训练日期"]):
+                    error_rows.append(index + 2)
+                    continue
+                
+                new_record = {
+                    "athlete_name": str(row["运动员名称"]).strip(),
+                    "training_date": str(row["训练日期"]).strip(),
+                    "footwork_type": str(row["步法类型"]).strip(),
+                    "stroke_technique": str(row["击球技术"]).strip(),
+                    "multi_ball_minutes": int(row["多球时长"]) if pd.notna(row["多球时长"]) else 0,
+                    "intensity": str(row["训练强度"]).strip(),
+                    "note": str(row["备注"]).strip() if pd.notna(row["备注"]) else ""
+                }
+                
+                TRAINING_RECORDS.append(new_record)
+                imported_count += 1
+            except Exception as e:
+                error_rows.append(index + 2)
+        
+        if error_rows:
+            flash(f"成功导入 {imported_count} 条记录，{len(error_rows)} 行数据有误（第 {', '.join(map(str, error_rows))} 行）。", "warning")
         else:
-            flash(f"已收到文件：{file.filename}，系统将执行数据校验。", "success")
+            flash(f"成功导入 {imported_count} 条训练记录。", "success")
+        
         return redirect(url_for("training.batch_import"))
 
     injuries_bp = Blueprint("injuries", __name__, url_prefix="/injuries")

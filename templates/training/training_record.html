@@ -1,0 +1,120 @@
+{% extends "base.html" %}
+
+{% block title %}训练记录查看{% endblock %}
+
+{% block content %}
+<div class="d-flex flex-column flex-md-row align-items-md-center justify-content-between gap-3 mb-4">
+    <div>
+        <h1 class="page-title h3 mb-1">训练记录查看</h1>
+        <p class="text-secondary mb-0">查看所有已录入的技术训练记录，支持按运动员和日期筛选。</p>
+    </div>
+    <a href="/training/batch-import" class="btn btn-outline-primary">
+        <i class="bi bi-plus-circle"></i> 返回录入
+    </a>
+</div>
+
+<!-- 筛选条件 -->
+<div class="card shadow-sm mb-4">
+    <div class="card-body">
+        <form method="get" action="{{ url_for('training.record') }}" class="row g-3 align-items-end">
+            <div class="col-12 col-md-4">
+                <label for="filter_athlete" class="form-label">运动员</label>
+                <select class="form-select" id="filter_athlete" name="athlete_name">
+                    <option value="">全部运动员</option>
+                    {% for athlete_name in all_athletes %}
+                    <option value="{{ athlete_name }}" {% if request.args.get('athlete_name') == athlete_name %}selected{% endif %}>
+                        {{ athlete_name }}
+                    </option>
+                    {% endfor %}
+                </select>
+            </div>
+            <div class="col-12 col-md-3">
+                <label for="filter_start_date" class="form-label">开始日期</label>
+                <input type="date" class="form-control" id="filter_start_date" name="start_date" value="{{ request.args.get('start_date', '') }}">
+            </div>
+            <div class="col-12 col-md-3">
+                <label for="filter_end_date" class="form-label">结束日期</label>
+                <input type="date" class="form-control" id="filter_end_date" name="end_date" value="{{ request.args.get('end_date', '') }}">
+            </div>
+            <div class="col-12 col-md-2">
+                <button type="submit" class="btn btn-primary w-100">筛选</button>
+            </div>
+        </form>
+    </div>
+</div>
+
+<!-- 训练记录表格 -->
+<div class="card shadow-sm">
+    <div class="card-header bg-white d-flex justify-content-between align-items-center py-3">
+        <h2 class="h5 mb-0">训练记录列表</h2>
+        <span class="badge bg-secondary">{{ records|length }} 条记录</span>
+    </div>
+    <div class="card-body p-0">
+        <div class="table-responsive">
+            <table class="table table-hover table-striped mb-0">
+                <thead class="table-light">
+                    <tr>
+                        <th>运动员姓名</th> 
+                        <th>训练日期</th>
+                        <th>步法类型</th>
+                        <th>击球技术</th>
+                        <th>多球时长(分钟)</th>
+                        <th>训练强度</th>
+                        <th>备注</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% if records %}
+                    {% for record in records %}
+                    <tr>
+                        <td>{{ record.athlete_name }}</td>  
+                        <td>{{ record.training_date }}</td>
+                        <td>
+                            {% if record.footwork_type == 'single_step' %}单步
+                            {% elif record.footwork_type == 'parallel_step' %}并步
+                            {% elif record.footwork_type == 'cross_step' %}交叉步
+                            {% elif record.footwork_type == 'composite' %}综合步法
+                            {% else %}{{ record.footwork_type }}
+                            {% endif %}
+                        </td>
+                        <td>
+                            {% if record.stroke_technique == 'forehand_loop' %}正手弧圈
+                            {% elif record.stroke_technique == 'backhand_drive' %}反手快拨
+                            {% elif record.stroke_technique == 'serve_receive' %}发接发
+                            {% elif record.stroke_technique == 'smash' %}扣杀
+                            {% elif record.stroke_technique == 'defense' %}防守转换
+                            {% else %}{{ record.stroke_technique }}
+                            {% endif %}
+                        </td>
+                        <td>{{ record.multi_ball_minutes }}</td>
+                        <td>
+                            {% if record.intensity == 'low' %}
+                            <span class="badge bg-success">低强度</span>
+                            {% elif record.intensity == 'medium' %}
+                            <span class="badge bg-info">中强度</span>
+                            {% elif record.intensity == 'high' %}
+                            <span class="badge bg-warning text-dark">高强度</span>
+                            {% elif record.intensity == 'extreme' %}
+                            <span class="badge bg-danger">极高强度</span>
+                            {% else %}
+                            <span class="badge bg-secondary">{{ record.intensity }}</span>
+                            {% endif %}
+                        </td>
+                        <td class="text-truncate" style="max-width: 200px;" title="{{ record.note or '' }}">
+                            {{ record.note or '-' }}
+                        </td>
+                    </tr>
+                    {% endfor %}
+                    {% else %}
+                    <tr>
+                        <td colspan="7" class="text-center text-secondary py-4">
+                            暂无训练记录数据，请先录入训练数据。
+                        </td>
+                    </tr>
+                    {% endif %}
+                </tbody>
+            </table>
+        </div>
+    </div>
+</div>
+{% endblock %}
