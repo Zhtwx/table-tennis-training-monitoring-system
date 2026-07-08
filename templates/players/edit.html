@@ -1,0 +1,227 @@
+{% extends "base.html" %}
+
+{% block title %}编辑运动员 - {{ athlete.name }} - 乒乓球运动员综合训练监控管理系统{% endblock %}
+
+{% block content %}
+<div class="d-flex align-items-center gap-3 mb-4">
+    <a href="{{ url_for('players.detail', player_id=athlete.id) }}" class="btn btn-outline-secondary btn-sm" title="返回详情">
+        <i class="bi bi-arrow-left"></i> 返回
+    </a>
+    <div>
+        <h1 class="page-title h3 mb-1">编辑运动员档案</h1>
+        <p class="text-secondary mb-0">修改 {{ athlete.name }}（{{ athlete.student_no }}）的基本信息和竞技特征。</p>
+    </div>
+</div>
+
+<div class="row">
+    <div class="col-12 col-lg-8">
+        <div class="card shadow-sm">
+            <div class="card-header bg-white border-0 pt-4 px-4">
+                <h2 class="h5 mb-1">档案编辑表单</h2>
+                <p class="text-secondary small mb-0">带 <span class="text-danger">*</span> 为必填项。</p>
+            </div>
+            <div class="card-body">
+                <form method="post" action="{{ url_for('players.edit', player_id=athlete.id) }}" novalidate>
+                    <!-- ============================================================ -->
+                    <!-- 必填信息区域                                                 -->
+                    <!-- ============================================================ -->
+                    <h3 class="h6 text-uppercase text-secondary mb-3 border-bottom pb-2">必填信息</h3>
+
+                    <div class="row g-3 mb-4">
+                        <!-- 学号 -->
+                        <div class="col-md-6">
+                            <label for="student_no" class="form-label">
+                                学号 <span class="text-danger">*</span>
+                            </label>
+                            <input type="text" class="form-control" id="student_no" name="student_no"
+                                   value="{{ request.form.get('student_no', athlete.student_no) }}"
+                                   maxlength="20" required>
+                            <div class="form-text">修改学号后将校验唯一性（排除自身）。</div>
+                        </div>
+
+                        <!-- 姓名 -->
+                        <div class="col-md-6">
+                            <label for="name" class="form-label">
+                                姓名 <span class="text-danger">*</span>
+                            </label>
+                            <input type="text" class="form-control" id="name" name="name"
+                                   value="{{ request.form.get('name', athlete.name) }}"
+                                   maxlength="50" required>
+                        </div>
+
+                        <!-- 性别 -->
+                        <div class="col-md-6">
+                            <label for="gender" class="form-label">
+                                性别 <span class="text-danger">*</span>
+                            </label>
+                            <select class="form-select" id="gender" name="gender" required>
+                                <option value="">-- 请选择 --</option>
+                                {% for code, label in gender_choices %}
+                                <option value="{{ code }}"
+                                    {% if request.form.get('gender', athlete.gender) == code %}selected{% endif %}>
+                                    {{ label }}
+                                </option>
+                                {% endfor %}
+                            </select>
+                        </div>
+
+                        <!-- 运动等级 -->
+                        <div class="col-md-6">
+                            <label for="skill_level" class="form-label">
+                                运动等级 <span class="text-danger">*</span>
+                            </label>
+                            <select class="form-select" id="skill_level" name="skill_level" required>
+                                <option value="">-- 请选择 --</option>
+                                {% for code, label in skill_level_choices %}
+                                <option value="{{ code }}"
+                                    {% if request.form.get('skill_level', athlete.skill_level) == code %}selected{% endif %}>
+                                    {{ label }}
+                                </option>
+                                {% endfor %}
+                            </select>
+                        </div>
+                    </div>
+
+                    <!-- ============================================================ -->
+                    <!-- 选填信息区域                                                 -->
+                    <!-- ============================================================ -->
+                    <h3 class="h6 text-uppercase text-secondary mb-3 border-bottom pb-2">选填信息</h3>
+
+                    <div class="row g-3 mb-4">
+                        <!-- 出生日期 -->
+                        <div class="col-md-6">
+                            <label for="birth_date" class="form-label">出生日期</label>
+                            <input type="date" class="form-control" id="birth_date" name="birth_date"
+                                   value="{{ request.form.get('birth_date', athlete.birth_date.strftime('%Y-%m-%d') if athlete.birth_date else '') }}">
+                            <div class="form-text">当前年龄：{{ athlete.age }} 岁</div>
+                        </div>
+
+                        <!-- 所属队伍 -->
+                        <div class="col-md-6">
+                            <label for="team" class="form-label">所属队伍</label>
+                            <input type="text" class="form-control" id="team" name="team"
+                                   value="{{ request.form.get('team', athlete.team or '') }}"
+                                   maxlength="100">
+                        </div>
+
+                        <!-- 主打法 -->
+                        <div class="col-md-6">
+                            <label for="play_style" class="form-label">主打法</label>
+                            <input type="text" class="form-control" id="play_style" name="play_style"
+                                   value="{{ request.form.get('play_style', athlete.play_style or '') }}"
+                                   maxlength="100">
+                        </div>
+
+                        <!-- 握拍方式 -->
+                        <div class="col-md-6">
+                            <label for="grip" class="form-label">握拍方式</label>
+                            <input type="text" class="form-control" id="grip" name="grip"
+                                   value="{{ request.form.get('grip', athlete.grip or '') }}"
+                                   maxlength="50">
+                        </div>
+
+                        <!-- 联系电话 -->
+                        <div class="col-md-6">
+                            <label for="contact_phone" class="form-label">联系电话</label>
+                            <input type="text" class="form-control" id="contact_phone" name="contact_phone"
+                                   value="{{ request.form.get('contact_phone', athlete.contact_phone or '') }}"
+                                   maxlength="20">
+                        </div>
+                    </div>
+
+                    <!-- ============================================================ -->
+                    <!-- 伤病状态（触发器预留字段）                                    -->
+                    <!-- 设计说明：                                                    -->
+                    <!--   此字段通常由 injury_record 表的 INSERT/UPDATE/DELETE       -->
+                    <!--   触发器通过调用 sp_refresh_athlete_injury_status 存储过程    -->
+                    <!--   自动维护。管理员可在此手动修正特殊情况下不一致的状态。       -->
+                    <!-- ============================================================ -->
+                    <h3 class="h6 text-uppercase text-secondary mb-3 border-bottom pb-2">
+                        伤病状态
+                        <small class="text-muted fw-normal">（由触发器自动维护，一般无需手动修改）</small>
+                    </h3>
+
+                    <div class="row g-3 mb-4">
+                        <div class="col-md-6">
+                            <label for="injury_status" class="form-label">当前伤病状态</label>
+                            <select class="form-select" id="injury_status" name="injury_status">
+                                {% for code, label in injury_status_choices %}
+                                <option value="{{ code }}"
+                                    {% if request.form.get('injury_status', athlete.injury_status) == code %}selected{% endif %}>
+                                    {{ label }}
+                                </option>
+                                {% endfor %}
+                            </select>
+                            <div class="form-text">
+                                <i class="bi bi-info-circle"></i>
+                                此字段由 <code>injury_record</code> 表的触发器自动更新。
+                                新增/修改/删除伤病记录时，系统会自动调用
+                                <code>sp_refresh_athlete_injury_status</code> 存储过程重新计算状态。
+                                仅在触发器未正常触发或需特殊处理时手动修改。
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- ============================================================ -->
+                    <!-- 元数据（只读展示）                                           -->
+                    <!-- ============================================================ -->
+                    <h3 class="h6 text-uppercase text-secondary mb-3 border-bottom pb-2">元数据（只读）</h3>
+                    <div class="row g-3 mb-4">
+                        <div class="col-md-6">
+                            <label class="form-label text-secondary">创建时间</label>
+                            <p class="form-control-plaintext">{{ athlete.create_time or '-' }}</p>
+                        </div>
+                        <div class="col-md-6">
+                            <label class="form-label text-secondary">最后更新</label>
+                            <p class="form-control-plaintext">{{ athlete.update_time or '-' }}</p>
+                        </div>
+                    </div>
+
+                    <!-- ============================================================ -->
+                    <!-- 操作按钮                                                     -->
+                    <!-- ============================================================ -->
+                    <div class="d-flex gap-2 justify-content-end border-top pt-3">
+                        <a href="{{ url_for('players.detail', player_id=athlete.id) }}" class="btn btn-outline-secondary">取消</a>
+                        <button type="submit" class="btn btn-primary">
+                            <i class="bi bi-check-lg"></i> 保存修改
+                        </button>
+                    </div>
+                </form>
+            </div>
+        </div>
+    </div>
+
+    <!-- 侧边提示 -->
+    <div class="col-12 col-lg-4 mt-4 mt-lg-0">
+        <div class="card shadow-sm mb-3">
+            <div class="card-header bg-white border-0 pt-4 px-4">
+                <h2 class="h6 mb-1">编辑说明</h2>
+            </div>
+            <div class="card-body">
+                <ul class="list-unstyled small mb-0">
+                    <li class="mb-2"><i class="bi bi-info-circle text-primary"></i> <strong>学号</strong>：修改后将检查新学号是否与其他运动员冲突。</li>
+                    <li class="mb-2"><i class="bi bi-info-circle text-primary"></i> <strong>出生日期</strong>：修改后系统将重新计算年龄。</li>
+                    <li class="mb-2"><i class="bi bi-exclamation-triangle text-warning"></i> <strong>伤病状态</strong>：建议由触发器自动管理，手动修改可能被下一次伤病记录变更覆盖。</li>
+                    <li><i class="bi bi-shield-check text-success"></i> <strong>提示</strong>：修改提交后自动更新 <code>update_time</code> 字段。</li>
+                </ul>
+            </div>
+        </div>
+
+        <div class="card shadow-sm">
+            <div class="card-header bg-white border-0 pt-4 px-4">
+                <h2 class="h6 mb-1">快速操作</h2>
+            </div>
+            <div class="card-body">
+                <div class="d-grid gap-2">
+                    <a href="{{ url_for('players.detail', player_id=athlete.id) }}" class="btn btn-outline-primary btn-sm">
+                        查看完整档案
+                    </a>
+                    <a href="{{ url_for('players.list') }}" class="btn btn-outline-secondary btn-sm">
+                        返回运动员列表
+                    </a>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}

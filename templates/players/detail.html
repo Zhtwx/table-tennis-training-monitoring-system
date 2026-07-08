@@ -1,0 +1,443 @@
+{% extends "base.html" %}
+
+{% block title %}{{ athlete.name }} - 运动员档案 - 乒乓球运动员综合训练监控管理系统{% endblock %}
+
+{% block content %}
+<!-- ============================================================ -->
+<!-- 页面标题与操作栏                                              -->
+<!-- ============================================================ -->
+<div class="d-flex flex-column flex-md-row align-items-md-center justify-content-between gap-3 mb-4">
+    <div class="d-flex align-items-center gap-3">
+        <a href="{{ url_for('players.list') }}" class="btn btn-outline-secondary btn-sm" title="返回列表">
+            <i class="bi bi-arrow-left"></i>
+        </a>
+        <div>
+            <h1 class="page-title h3 mb-1">{{ athlete.name }} 的综合档案</h1>
+            <p class="text-secondary mb-0">
+                <code>{{ athlete.student_no }}</code> · {{ athlete.gender }} · {{ athlete.age }} 岁
+            </p>
+        </div>
+    </div>
+    <div class="d-flex gap-2">
+        {% if current_user.role == 'admin' %}
+            <a href="{{ url_for('players.edit', player_id=athlete.id) }}" class="btn btn-outline-primary">
+                <i class="bi bi-pencil"></i> 编辑档案
+            </a>
+        {% endif %}
+        <a href="{{ url_for('injuries.history', player_id=athlete.id) }}" class="btn btn-outline-secondary">
+            伤病历史
+        </a>
+    </div>
+</div>
+
+<!-- ============================================================ -->
+<!-- 第一行：基本信息卡片 + 训练统计卡片                           -->
+<!-- ============================================================ -->
+<div class="row g-4 mb-4">
+    <!-- 基本信息卡片 -->
+    <div class="col-12 col-md-6 col-xl-4">
+        <div class="card shadow-sm h-100">
+            <div class="card-header bg-white border-0 pt-4 px-4 d-flex justify-content-between align-items-start">
+                <h2 class="h5 mb-0">基本信息</h2>
+                <span class="badge {{ injury_status_badge_class }}">{{ athlete.injury_status }}</span>
+            </div>
+            <div class="card-body">
+                <dl class="row small mb-0">
+                    <dt class="col-sm-5 text-secondary">学号</dt>
+                    <dd class="col-sm-7"><code>{{ athlete.student_no }}</code></dd>
+
+                    <dt class="col-sm-5 text-secondary">姓名</dt>
+                    <dd class="col-sm-7 fw-semibold">{{ athlete.name }}</dd>
+
+                    <dt class="col-sm-5 text-secondary">性别</dt>
+                    <dd class="col-sm-7">{{ athlete.gender }}</dd>
+
+                    <dt class="col-sm-5 text-secondary">年龄</dt>
+                    <dd class="col-sm-7">{{ athlete.age }} 岁</dd>
+
+                    <dt class="col-sm-5 text-secondary">出生日期</dt>
+                    <dd class="col-sm-7">{{ athlete.birth_date or '-' }}</dd>
+
+                    <dt class="col-sm-5 text-secondary">所属队伍</dt>
+                    <dd class="col-sm-7">{{ athlete.team or '-' }}</dd>
+
+                    <dt class="col-sm-5 text-secondary">运动等级</dt>
+                    <dd class="col-sm-7"><span class="badge text-bg-light">{{ athlete.skill_level }}</span></dd>
+
+                    <dt class="col-sm-5 text-secondary">主打法</dt>
+                    <dd class="col-sm-7">{{ athlete.play_style or '-' }}</dd>
+
+                    <dt class="col-sm-5 text-secondary">握拍方式</dt>
+                    <dd class="col-sm-7">{{ athlete.grip or '-' }}</dd>
+
+                    <dt class="col-sm-5 text-secondary">联系电话</dt>
+                    <dd class="col-sm-7">{{ athlete.contact_phone or '-' }}</dd>
+
+                    <dt class="col-sm-5 text-secondary">档案创建</dt>
+                    <dd class="col-sm-7 text-secondary">{{ athlete.create_time or '-' }}</dd>
+                </dl>
+            </div>
+        </div>
+    </div>
+
+    <!-- 训练统计卡片 -->
+    <div class="col-12 col-md-6 col-xl-4">
+        <div class="card shadow-sm h-100">
+            <div class="card-header bg-white border-0 pt-4 px-4">
+                <h2 class="h5 mb-0">训练概况</h2>
+            </div>
+            <div class="card-body">
+                <div class="row g-3 text-center">
+                    <div class="col-6">
+                        <div class="border rounded-3 p-3">
+                            <div class="fs-3 fw-bold text-primary">{{ training_stats.total_plans }}</div>
+                            <div class="small text-secondary">训练计划数</div>
+                        </div>
+                    </div>
+                    <div class="col-6">
+                        <div class="border rounded-3 p-3">
+                            <div class="fs-3 fw-bold text-primary">{{ "%.1f"|format(training_stats.total_hours) }}</div>
+                            <div class="small text-secondary">累计时长 (h)</div>
+                        </div>
+                    </div>
+                    <div class="col-6">
+                        <div class="border rounded-3 p-3">
+                            <div class="fs-3 fw-bold text-success">{{ training_stats.active_plans }}</div>
+                            <div class="small text-secondary">进行中</div>
+                        </div>
+                    </div>
+                    <div class="col-6">
+                        <div class="border rounded-3 p-3">
+                            <div class="fs-3 fw-bold text-secondary">{{ training_stats.completed_plans }}</div>
+                            <div class="small text-secondary">已完成</div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- 比赛成绩统计卡片 -->
+    <div class="col-12 col-md-12 col-xl-4">
+        <div class="card shadow-sm h-100">
+            <div class="card-header bg-white border-0 pt-4 px-4">
+                <h2 class="h5 mb-0">比赛成绩</h2>
+            </div>
+            <div class="card-body">
+                {% if match_stats and match_stats.total_matches > 0 %}
+                <div class="row g-3 text-center">
+                    <div class="col-4">
+                        <div class="border rounded-3 p-3">
+                            <div class="fs-3 fw-bold text-primary">{{ match_stats.total_matches }}</div>
+                            <div class="small text-secondary">总场次</div>
+                        </div>
+                    </div>
+                    <div class="col-4">
+                        <div class="border rounded-3 p-3">
+                            <div class="fs-3 fw-bold text-success">{{ match_stats.wins }}</div>
+                            <div class="small text-secondary">胜</div>
+                        </div>
+                    </div>
+                    <div class="col-4">
+                        <div class="border rounded-3 p-3">
+                            <div class="fs-3 fw-bold text-danger">{{ match_stats.losses }}</div>
+                            <div class="small text-secondary">负</div>
+                        </div>
+                    </div>
+                </div>
+                {% if match_stats.total_matches > 0 %}
+                <div class="mt-3">
+                    <div class="d-flex justify-content-between small text-secondary mb-1">
+                        <span>胜率</span>
+                        <span>{{ "%.1f"|format(match_stats.wins / match_stats.total_matches * 100) }}%</span>
+                    </div>
+                    <div class="progress" style="height: 6px;">
+                        <div class="progress-bar bg-success" role="progressbar"
+                             style="width: {{ match_stats.wins / match_stats.total_matches * 100 }}%"
+                             aria-valuenow="{{ match_stats.wins }}" aria-valuemin="0"
+                             aria-valuemax="{{ match_stats.total_matches }}"></div>
+                    </div>
+                </div>
+                {% endif %}
+                {% else %}
+                <p class="text-secondary text-center mb-0 py-3">暂无比赛记录</p>
+                {% endif %}
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- ============================================================ -->
+<!-- 第二行：技术评估 + 体能测试评分                               -->
+<!-- ============================================================ -->
+<div class="row g-4 mb-4">
+    <!-- 技术评估 -->
+    <div class="col-12 col-lg-6">
+        <div class="card shadow-sm h-100">
+            <div class="card-header bg-white border-0 pt-4 px-4">
+                <h2 class="h5 mb-1">技术评估</h2>
+                <p class="text-secondary small mb-0">
+                    {% if tech_stats and tech_stats.total_records > 0 %}
+                        共 {{ tech_stats.total_records }} 次评估记录
+                    {% else %}
+                        暂无评估数据
+                    {% endif %}
+                </p>
+            </div>
+            <div class="card-body">
+                {% if tech_stats and tech_stats.total_records > 0 %}
+                <div class="table-responsive">
+                    <table class="table table-sm small">
+                        <thead class="table-light">
+                            <tr>
+                                <th>技术指标</th>
+                                <th class="text-end">平均分</th>
+                                <th>评分条</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            {% set tech_items = [
+                                ('正手', tech_stats.avg_forehand),
+                                ('反手', tech_stats.avg_backhand),
+                                ('发球', tech_stats.avg_serve),
+                                ('步法', tech_stats.avg_footwork),
+                                ('反应', tech_stats.avg_reaction),
+                                ('综合', tech_stats.avg_overall),
+                            ] %}
+                            {% for label, score in tech_items %}
+                            <tr>
+                                <td>{{ label }}</td>
+                                <td class="text-end fw-semibold">{{ score }}</td>
+                                <td style="width: 120px;">
+                                    <div class="progress" style="height: 6px;">
+                                        {% set pct = (score or 0) | float %}
+                                        <div class="progress-bar {% if pct >= 90 %}bg-success{% elif pct >= 75 %}bg-primary{% elif pct >= 60 %}bg-warning{% else %}bg-danger{% endif %}"
+                                             role="progressbar" style="width: {{ pct }}%"
+                                             aria-valuenow="{{ pct }}" aria-valuemin="0" aria-valuemax="100"></div>
+                                    </div>
+                                </td>
+                            </tr>
+                            {% endfor %}
+                        </tbody>
+                    </table>
+                </div>
+                {% else %}
+                <p class="text-secondary text-center mb-0 py-4">暂无技术评估记录</p>
+                {% endif %}
+            </div>
+        </div>
+    </div>
+
+    <!-- 体能测试 -->
+    <div class="col-12 col-lg-6">
+        <div class="card shadow-sm h-100">
+            <div class="card-header bg-white border-0 pt-4 px-4">
+                <h2 class="h5 mb-1">体能测试</h2>
+                <p class="text-secondary small mb-0">
+                    {% if fitness_stats and fitness_stats.total_tests > 0 %}
+                        共 {{ fitness_stats.total_tests }} 次测试记录
+                    {% else %}
+                        暂无测试数据
+                    {% endif %}
+                </p>
+            </div>
+            <div class="card-body">
+                {% if fitness_stats and fitness_stats.total_tests > 0 %}
+                <div class="table-responsive">
+                    <table class="table table-sm small">
+                        <thead class="table-light">
+                            <tr>
+                                <th>体能指标</th>
+                                <th class="text-end">平均分</th>
+                                <th>评分条</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            {% set fitness_items = [
+                                ('上肢力量', fitness_stats.avg_upper),
+                                ('下肢力量', fitness_stats.avg_lower),
+                                ('柔韧性', fitness_stats.avg_flexibility),
+                                ('耐力', fitness_stats.avg_endurance),
+                                ('速度', fitness_stats.avg_speed),
+                                ('综合', fitness_stats.avg_overall),
+                            ] %}
+                            {% for label, score in fitness_items %}
+                            <tr>
+                                <td>{{ label }}</td>
+                                <td class="text-end fw-semibold">{{ score }}</td>
+                                <td style="width: 120px;">
+                                    <div class="progress" style="height: 6px;">
+                                        {% set pct = (score or 0) | float %}
+                                        <div class="progress-bar {% if pct >= 90 %}bg-success{% elif pct >= 75 %}bg-primary{% elif pct >= 60 %}bg-warning{% else %}bg-danger{% endif %}"
+                                             role="progressbar" style="width: {{ pct }}%"
+                                             aria-valuenow="{{ pct }}" aria-valuemin="0" aria-valuemax="100"></div>
+                                    </div>
+                                </td>
+                            </tr>
+                            {% endfor %}
+                        </tbody>
+                    </table>
+                </div>
+                {% else %}
+                <p class="text-secondary text-center mb-0 py-4">暂无体能测试记录</p>
+                {% endif %}
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- ============================================================ -->
+<!-- 第三行：伤病记录 + 近期比赛                                    -->
+<!-- ============================================================ -->
+<div class="row g-4">
+    <!-- 伤病记录 -->
+    <div class="col-12 col-lg-6">
+        <div class="card shadow-sm h-100">
+            <div class="card-header bg-white border-0 pt-4 px-4 d-flex justify-content-between align-items-center">
+                <div>
+                    <h2 class="h5 mb-1">伤病记录</h2>
+                    <p class="text-secondary small mb-0">最近 5 条记录</p>
+                </div>
+                <a href="{{ url_for('injuries.history', player_id=athlete.id) }}" class="btn btn-sm btn-outline-secondary">
+                    查看全部
+                </a>
+            </div>
+            <div class="card-body">
+                {% if injury_records %}
+                <div class="table-responsive">
+                    <table class="table table-sm small">
+                        <thead class="table-light">
+                            <tr>
+                                <th>日期</th>
+                                <th>部位</th>
+                                <th>严重程度</th>
+                                <th>恢复状态</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            {% for record in injury_records %}
+                            <tr>
+                                <td>{{ record.injury_date }}</td>
+                                <td>{{ record.injury_location }}</td>
+                                <td>
+                                    {% if record.severity == '轻微' %}
+                                        <span class="badge text-bg-success">轻微</span>
+                                    {% elif record.severity == '中度' %}
+                                        <span class="badge text-bg-warning">中度</span>
+                                    {% elif record.severity == '严重' %}
+                                        <span class="badge text-bg-danger">严重</span>
+                                    {% endif %}
+                                </td>
+                                <td>
+                                    {% if record.recovery_status == '已恢复' %}
+                                        <span class="badge text-bg-success">已恢复</span>
+                                    {% elif record.recovery_status == '康复中' %}
+                                        <span class="badge text-bg-info">康复中</span>
+                                    {% elif record.recovery_status == '治疗中' %}
+                                        <span class="badge text-bg-warning">治疗中</span>
+                                    {% endif %}
+                                </td>
+                            </tr>
+                            {% endfor %}
+                        </tbody>
+                    </table>
+                </div>
+                {% else %}
+                <p class="text-success text-center mb-0 py-4">
+                    <i class="bi bi-check-circle"></i> 暂无伤病记录，运动员状态良好。
+                </p>
+                {% endif %}
+            </div>
+        </div>
+    </div>
+
+    <!-- 近期比赛 -->
+    <div class="col-12 col-lg-6">
+        <div class="card shadow-sm h-100">
+            <div class="card-header bg-white border-0 pt-4 px-4">
+                <div>
+                    <h2 class="h5 mb-1">近期比赛</h2>
+                    <p class="text-secondary small mb-0">最近 5 场比赛记录</p>
+                </div>
+            </div>
+            <div class="card-body">
+                {% if match_records %}
+                <div class="table-responsive">
+                    <table class="table table-sm small">
+                        <thead class="table-light">
+                            <tr>
+                                <th>日期</th>
+                                <th>比赛名称</th>
+                                <th>对手</th>
+                                <th>赛果</th>
+                                <th>比分</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            {% for record in match_records %}
+                            <tr>
+                                <td>{{ record.match_date }}</td>
+                                <td>{{ record.match_name }}</td>
+                                <td>{{ record.opponent or '-' }}</td>
+                                <td>
+                                    {% if record.result == '胜' %}
+                                        <span class="badge text-bg-success">胜</span>
+                                    {% elif record.result == '负' %}
+                                        <span class="badge text-bg-danger">负</span>
+                                    {% else %}
+                                        <span class="badge text-bg-secondary">平</span>
+                                    {% endif %}
+                                </td>
+                                <td><code>{{ record.score or '-' }}</code></td>
+                            </tr>
+                            {% endfor %}
+                        </tbody>
+                    </table>
+                </div>
+                {% else %}
+                <p class="text-secondary text-center mb-0 py-4">暂无比赛记录</p>
+                {% endif %}
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- ============================================================ -->
+<!-- 伤病状态触发器适配说明                                        -->
+<!-- 设计说明（仅 admin 可见）：                                    -->
+<!--   此提示框向管理员解释 athlete.injury_status 字段如何通过     -->
+<!--   injury_record 表的触发器自动维护，便于理解系统设计意图。     -->
+<!-- ============================================================ -->
+{% if current_user.role == 'admin' %}
+<div class="card shadow-sm mt-4 border-info">
+    <div class="card-header bg-info bg-opacity-10 border-info border-opacity-25 pt-3 px-4">
+        <h2 class="h6 mb-0">
+            <i class="bi bi-database-gear text-info"></i>
+            管理员备注：injury_status 触发器适配方案
+        </h2>
+    </div>
+    <div class="card-body small">
+        <p class="mb-2">
+            <strong>当前伤病状态：</strong>
+            <span class="badge {{ injury_status_badge_class }}">{{ athlete.injury_status }}</span>
+        </p>
+        <p class="text-secondary mb-2">
+            此字段由 <code>injury_record</code> 表的以下触发器自动维护：
+        </p>
+        <ul class="mb-2">
+            <li><code>trg_injury_after_insert</code> — 新增伤病记录后自动刷新</li>
+            <li><code>trg_injury_after_update</code> — 修改伤病记录后自动刷新</li>
+            <li><code>trg_injury_after_delete</code> — 删除伤病记录后自动刷新</li>
+        </ul>
+        <p class="text-secondary mb-0">
+            三个触发器均调用存储过程 <code>sp_refresh_athlete_injury_status(athlete_id)</code>，
+            根据该运动员所有未恢复的伤病记录重新计算状态：
+            有「严重」+「治疗中」→ 伤病中；
+            有「治疗中」→ 观察中；
+            有「康复中」→ 康复中；
+            其余 → 健康。
+        </p>
+    </div>
+</div>
+{% endif %}
+{% endblock %}
