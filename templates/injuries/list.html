@@ -27,6 +27,10 @@
         background: var(--tt-primary);
     }
 
+    .alert-list {
+        border-left: 4px solid #dc3545;
+    }
+
     @media (max-width: 991.98px) {
         .form-panel {
             position: static;
@@ -79,6 +83,27 @@
     </div>
 </div>
 
+{% if training_alerts %}
+<div class="card shadow-sm alert-list mb-4">
+    <div class="card-header bg-white border-0 pt-4 px-4">
+        <h2 class="h5 mb-1">训练计划风险提示</h2>
+    </div>
+    <div class="card-body">
+        <div class="row g-3">
+            {% for item in training_alerts %}
+                <div class="col-12 col-lg-6">
+                    <div class="border rounded-3 p-3 h-100 bg-light">
+                        <div class="fw-semibold">{{ item.player_name }} · {{ item.injury_location }}</div>
+                        <div class="text-secondary small mt-1">{{ item.severity }} / {{ item.recovery_status }}</div>
+                        <div class="small mt-2">{{ item.alert }}</div>
+                    </div>
+                </div>
+            {% endfor %}
+        </div>
+    </div>
+</div>
+{% endif %}
+
 <div class="card shadow-sm mb-4">
     <div class="card-header bg-white border-0 pt-4 px-4">
         <h2 class="h5 mb-1">伤病记录查询</h2>
@@ -128,6 +153,13 @@
                     <label class="form-check-label" for="active_only">只看未恢复</label>
                 </div>
             </div>
+            <div class="col-12 col-md-2">
+                <div class="form-check">
+                    <input class="form-check-input" type="checkbox" id="show_archived" name="show_archived" value="1"
+                           {% if request.args.get('show_archived') %}checked{% endif %}>
+                    <label class="form-check-label" for="show_archived">包含已作废</label>
+                </div>
+            </div>
             <div class="col-6 col-md-2 d-grid">
                 <button type="submit" class="btn btn-primary">执行查询</button>
             </div>
@@ -173,6 +205,7 @@
                                 <th>部位 / 类型</th>
                                 <th>程度</th>
                                 <th>恢复状态</th>
+                                <th>复诊</th>
                                 <th>预计恢复</th>
                                 <th class="text-end">操作</th>
                             </tr>
@@ -195,16 +228,37 @@
                                     {% if record.is_overdue %}
                                         <span class="badge text-bg-warning ms-1">逾期</span>
                                     {% endif %}
+                                    {% if record.is_deleted %}
+                                        <span class="badge text-bg-secondary ms-1">已作废</span>
+                                    {% endif %}
+                                </td>
+                                <td>
+                                    <div>{{ record.followup_count }} 次</div>
+                                    {% if record.latest_followup %}
+                                        <div class="text-secondary small">{{ record.latest_followup.followup_date }} · 疼痛 {{ record.latest_followup.pain_score }}/10</div>
+                                    {% else %}
+                                        <div class="text-secondary small">暂无复诊</div>
+                                    {% endif %}
                                 </td>
                                 <td class="text-nowrap">{{ record.expected_recovery_date or '-' }}</td>
                                 <td class="text-end text-nowrap">
-                                    <a href="{{ url_for('injuries.list', edit_id=record.id) }}" class="btn btn-sm btn-outline-primary">修改</a>
+                                    {% if not record.is_deleted %}
+                                        {% if current_user.role == 'admin' %}
+                                            <a href="{{ url_for('injuries.list', edit_id=record.id) }}" class="btn btn-sm btn-outline-primary">修改</a>
+                                        {% endif %}
+                                        <button type="button" class="btn btn-sm btn-outline-success"
+                                                data-bs-toggle="modal" data-bs-target="#followupModal{{ record.id }}">复诊</button>
+                                        {% if current_user.role == 'admin' %}
+                                            <button type="button" class="btn btn-sm btn-outline-danger"
+                                                    data-bs-toggle="modal" data-bs-target="#archiveModal{{ record.id }}">作废</button>
+                                        {% endif %}
+                                    {% endif %}
                                     <a href="{{ url_for('injuries.history', player_id=record.athlete_id) }}" class="btn btn-sm btn-outline-secondary">历史</a>
                                 </td>
                             </tr>
                             {% else %}
                             <tr>
-                                <td colspan="7" class="text-center text-secondary py-5">暂无符合条件的伤病记录。</td>
+                                <td colspan="8" class="text-center text-secondary py-5">暂无符合条件的伤病记录。</td>
                             </tr>
                             {% endfor %}
                         </tbody>
@@ -212,6 +266,82 @@
                 </div>
             </div>
         </div>
+
+        {% for record in injury_records %}
+            {% if not record.is_deleted %}
+            <div class="modal fade" id="followupModal{{ record.id }}" tabindex="-1" aria-hidden="true">
+                <div class="modal-dialog modal-dialog-centered">
+                    <div class="modal-content">
+                        <form method="post" action="{{ url_for('injuries.list') }}">
+                            <input type="hidden" name="action" value="followup">
+                            <input type="hidden" name="followup_record_id" value="{{ record.id }}">
+                            <div class="modal-header">
+                                <h2 class="modal-title fs-5">新增复诊跟踪</h2>
+                                <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="关闭"></button>
+                            </div>
+                            <div class="modal-body">
+                                <div class="mb-3">
+                                    <div class="fw-semibold">{{ record.player_name }} · {{ record.injury_location }}</div>
+                                    <div class="text-secondary small">{{ record.injury_date }} / {{ record.injury_type }}</div>
+                                </div>
+                                <div class="row g-3">
+                                    <div class="col-6">
+                                        <label class="form-label" for="followup_date_{{ record.id }}">复诊日期</label>
+                                        <input type="date" class="form-control" id="followup_date_{{ record.id }}" name="followup_date" required>
+                                    </div>
+                                    <div class="col-6">
+                                        <label class="form-label" for="pain_score_{{ record.id }}">疼痛评分</label>
+                                        <input type="number" class="form-control" id="pain_score_{{ record.id }}" name="pain_score" min="0" max="10" required>
+                                    </div>
+                                    <div class="col-12">
+                                        <label class="form-label" for="training_limit_{{ record.id }}">训练限制</label>
+                                        <textarea class="form-control" id="training_limit_{{ record.id }}" name="training_limit" rows="2" maxlength="160" required></textarea>
+                                    </div>
+                                    <div class="col-12">
+                                        <label class="form-label" for="advice_{{ record.id }}">复诊建议</label>
+                                        <textarea class="form-control" id="advice_{{ record.id }}" name="advice" rows="2" maxlength="160" required></textarea>
+                                    </div>
+                                    <div class="col-12">
+                                        <label class="form-label" for="reviewer_{{ record.id }}">复诊人</label>
+                                        <input type="text" class="form-control" id="reviewer_{{ record.id }}" name="reviewer" maxlength="30" required>
+                                    </div>
+                                </div>
+                            </div>
+                            <div class="modal-footer">
+                                <button type="button" class="btn btn-outline-secondary" data-bs-dismiss="modal">取消</button>
+                                <button type="submit" class="btn btn-primary">保存复诊</button>
+                            </div>
+                        </form>
+                    </div>
+                </div>
+            </div>
+            {% endif %}
+            {% if current_user.role == 'admin' and not record.is_deleted %}
+            <div class="modal fade" id="archiveModal{{ record.id }}" tabindex="-1" aria-hidden="true">
+                <div class="modal-dialog modal-dialog-centered">
+                    <div class="modal-content">
+                        <form method="post" action="{{ url_for('injuries.list') }}">
+                            <input type="hidden" name="action" value="archive">
+                            <input type="hidden" name="archive_record_id" value="{{ record.id }}">
+                            <div class="modal-header">
+                                <h2 class="modal-title fs-5">作废归档伤病记录</h2>
+                                <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="关闭"></button>
+                            </div>
+                            <div class="modal-body">
+                                <p class="text-secondary small">作废后该记录不再参与运动员健康状态计算，可通过“包含已作废”查看归档记录。</p>
+                                <label class="form-label" for="delete_reason_{{ record.id }}">作废原因</label>
+                                <textarea class="form-control" id="delete_reason_{{ record.id }}" name="delete_reason" rows="3" maxlength="120" required></textarea>
+                            </div>
+                            <div class="modal-footer">
+                                <button type="button" class="btn btn-outline-secondary" data-bs-dismiss="modal">取消</button>
+                                <button type="submit" class="btn btn-danger">确认作废</button>
+                            </div>
+                        </form>
+                    </div>
+                </div>
+            </div>
+            {% endif %}
+        {% endfor %}
     </div>
 
     <div class="col-12 col-xl-4">
@@ -221,6 +351,7 @@
             </div>
             <div class="card-body">
                 <form method="post" action="{{ url_for('injuries.list') }}" class="row g-3">
+                    <input type="hidden" name="action" value="save">
                     <input type="hidden" name="record_id" value="{{ editing_record.id if editing_record else '' }}">
                     <div class="col-12">
                         <label for="athlete_id" class="form-label">运动员</label>

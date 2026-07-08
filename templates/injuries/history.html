@@ -99,12 +99,35 @@
                             {% if record.notes %}
                                 <div class="text-secondary small mt-1">备注：{{ record.notes }}</div>
                             {% endif %}
+                            {% if record.is_deleted %}
+                                <div class="text-secondary small mt-1">
+                                    作废归档：{{ record.delete_reason or '未填写原因' }}（{{ record.deleted_by or '-' }} / {{ record.deleted_at or '-' }}）
+                                </div>
+                            {% endif %}
+                            {% set followups = followups_by_record.get(record.id, []) %}
+                            {% if followups %}
+                                <div class="mt-3">
+                                    <div class="small fw-semibold mb-2">复诊跟踪</div>
+                                    <div class="vstack gap-2">
+                                        {% for followup in followups %}
+                                            <div class="border rounded-3 p-2 bg-light">
+                                                <div class="small fw-semibold">{{ followup.followup_date }} · 疼痛 {{ followup.pain_score }}/10 · {{ followup.reviewer }}</div>
+                                                <div class="text-secondary small mt-1">限制：{{ followup.training_limit }}</div>
+                                                <div class="text-secondary small mt-1">建议：{{ followup.advice }}</div>
+                                            </div>
+                                        {% endfor %}
+                                    </div>
+                                </div>
+                            {% endif %}
                         </div>
                         <div class="text-lg-end text-nowrap">
                             <span class="badge text-bg-{{ record.severity_class }}">{{ record.severity }}</span>
                             <span class="badge text-bg-{{ record.recovery_class }}">{{ record.recovery_status }}</span>
                             {% if record.is_overdue %}
                                 <span class="badge text-bg-warning">逾期</span>
+                            {% endif %}
+                            {% if record.is_deleted %}
+                                <span class="badge text-bg-secondary">已作废</span>
                             {% endif %}
                             <div class="text-secondary small mt-2">预计恢复：{{ record.expected_recovery_date or '-' }}</div>
                         </div>
