@@ -1,0 +1,165 @@
+{% extends "base.html" %}
+
+{% block title %}新增运动员 - 乒乓球运动员综合训练监控管理系统{% endblock %}
+
+{% block content %}
+<div class="d-flex align-items-center gap-3 mb-4">
+    <a href="{{ url_for('players.list') }}" class="btn btn-outline-secondary btn-sm" title="返回列表">
+        <i class="bi bi-arrow-left"></i> 返回
+    </a>
+    <div>
+        <h1 class="page-title h3 mb-1">新增运动员</h1>
+        <p class="text-secondary mb-0">建立运动员基础档案，包含基本信息与竞技特征。</p>
+    </div>
+</div>
+
+<div class="row">
+    <div class="col-12 col-lg-8">
+        <div class="card shadow-sm">
+            <div class="card-header bg-white border-0 pt-4 px-4">
+                <h2 class="h5 mb-1">运动员信息登记表</h2>
+                <p class="text-secondary small mb-0">带 <span class="text-danger">*</span> 为必填项。学号需保证唯一性。</p>
+            </div>
+            <div class="card-body">
+                <form method="post" action="{{ url_for('players.create') }}" novalidate>
+                    <!-- ============================================================ -->
+                    <!-- 必填信息区域                                                 -->
+                    <!-- ============================================================ -->
+                    <h3 class="h6 text-uppercase text-secondary mb-3 border-bottom pb-2">必填信息</h3>
+
+                    <div class="row g-3 mb-4">
+                        <!-- 学号 -->
+                        <div class="col-md-6">
+                            <label for="student_no" class="form-label">
+                                学号 <span class="text-danger">*</span>
+                            </label>
+                            <input type="text" class="form-control" id="student_no" name="student_no"
+                                   value="{{ form_data.get('student_no', '') if form_data else '' }}"
+                                   placeholder="例如：2026007" maxlength="20" required>
+                            <div class="form-text">学号需唯一，不超过 20 个字符。</div>
+                        </div>
+
+                        <!-- 姓名 -->
+                        <div class="col-md-6">
+                            <label for="name" class="form-label">
+                                姓名 <span class="text-danger">*</span>
+                            </label>
+                            <input type="text" class="form-control" id="name" name="name"
+                                   value="{{ form_data.get('name', '') if form_data else '' }}"
+                                   placeholder="例如：张三" maxlength="50" required>
+                            <div class="form-text">不超过 50 个字符。</div>
+                        </div>
+
+                        <!-- 性别 -->
+                        <div class="col-md-6">
+                            <label for="gender" class="form-label">
+                                性别 <span class="text-danger">*</span>
+                            </label>
+                            <select class="form-select" id="gender" name="gender" required>
+                                <option value="">-- 请选择 --</option>
+                                {% for code, label in gender_choices %}
+                                <option value="{{ code }}"
+                                    {% if form_data and form_data.get('gender') == code %}selected{% endif %}>
+                                    {{ label }}
+                                </option>
+                                {% endfor %}
+                            </select>
+                        </div>
+
+                        <!-- 运动等级 -->
+                        <div class="col-md-6">
+                            <label for="skill_level" class="form-label">
+                                运动等级 <span class="text-danger">*</span>
+                            </label>
+                            <select class="form-select" id="skill_level" name="skill_level" required>
+                                <option value="">-- 请选择 --</option>
+                                {% for code, label in skill_level_choices %}
+                                <option value="{{ code }}"
+                                    {% if form_data and form_data.get('skill_level') == code %}selected{% endif %}>
+                                    {{ label }}
+                                </option>
+                                {% endfor %}
+                            </select>
+                        </div>
+                    </div>
+
+                    <!-- ============================================================ -->
+                    <!-- 选填信息区域                                                 -->
+                    <!-- ============================================================ -->
+                    <h3 class="h6 text-uppercase text-secondary mb-3 border-bottom pb-2">选填信息</h3>
+
+                    <div class="row g-3 mb-4">
+                        <!-- 出生日期 -->
+                        <div class="col-md-6">
+                            <label for="birth_date" class="form-label">出生日期</label>
+                            <input type="date" class="form-control" id="birth_date" name="birth_date"
+                                   value="{{ form_data.get('birth_date', '') if form_data else '' }}">
+                            <div class="form-text">格式：YYYY-MM-DD。用于自动计算年龄。</div>
+                        </div>
+
+                        <!-- 所属队伍 -->
+                        <div class="col-md-6">
+                            <label for="team" class="form-label">所属队伍</label>
+                            <input type="text" class="form-control" id="team" name="team"
+                                   value="{{ form_data.get('team', '') if form_data else '' }}"
+                                   placeholder="例如：校乒乓球队、省青年队" maxlength="100">
+                        </div>
+
+                        <!-- 主打法 -->
+                        <div class="col-md-6">
+                            <label for="play_style" class="form-label">主打法</label>
+                            <input type="text" class="form-control" id="play_style" name="play_style"
+                                   value="{{ form_data.get('play_style', '') if form_data else '' }}"
+                                   placeholder="例如：右手横板快攻结合弧圈" maxlength="100">
+                        </div>
+
+                        <!-- 握拍方式 -->
+                        <div class="col-md-6">
+                            <label for="grip" class="form-label">握拍方式</label>
+                            <input type="text" class="form-control" id="grip" name="grip"
+                                   value="{{ form_data.get('grip', '') if form_data else '' }}"
+                                   placeholder="例如：右手横板、左手直板" maxlength="50">
+                        </div>
+
+                        <!-- 联系电话 -->
+                        <div class="col-md-6">
+                            <label for="contact_phone" class="form-label">联系电话</label>
+                            <input type="text" class="form-control" id="contact_phone" name="contact_phone"
+                                   value="{{ form_data.get('contact_phone', '') if form_data else '' }}"
+                                   placeholder="例如：13800001007" maxlength="20">
+                        </div>
+                    </div>
+
+                    <!-- ============================================================ -->
+                    <!-- 操作按钮                                                     -->
+                    <!-- ============================================================ -->
+                    <div class="d-flex gap-2 justify-content-end border-top pt-3">
+                        <a href="{{ url_for('players.list') }}" class="btn btn-outline-secondary">取消</a>
+                        <button type="submit" class="btn btn-primary">
+                            <i class="bi bi-check-lg"></i> 创建档案
+                        </button>
+                    </div>
+                </form>
+            </div>
+        </div>
+    </div>
+
+    <!-- 侧边提示 -->
+    <div class="col-12 col-lg-4 mt-4 mt-lg-0">
+        <div class="card shadow-sm">
+            <div class="card-header bg-white border-0 pt-4 px-4">
+                <h2 class="h6 mb-1">填写说明</h2>
+            </div>
+            <div class="card-body">
+                <ul class="list-unstyled small mb-0">
+                    <li class="mb-2"><i class="bi bi-info-circle text-primary"></i> <strong>学号</strong>：运动员在学校或队伍中的唯一编号，提交后将校验唯一性。</li>
+                    <li class="mb-2"><i class="bi bi-info-circle text-primary"></i> <strong>运动等级</strong>：按国家体育总局运动员技术等级标准填写。</li>
+                    <li class="mb-2"><i class="bi bi-info-circle text-primary"></i> <strong>出生日期</strong>：用于自动计算年龄，支持年龄范围筛选。</li>
+                    <li class="mb-2"><i class="bi bi-info-circle text-primary"></i> <strong>伤病状态</strong>：新建运动员默认「健康」，后续由伤病记录的触发器自动维护。</li>
+                    <li><i class="bi bi-shield-check text-success"></i> <strong>提示</strong>：提交后如需修改，可在运动员列表页点击「编辑」按钮。</li>
+                </ul>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}

@@ -17,23 +17,12 @@ from flask import (
     url_for,
 )
 
+# 认证与权限工具（共享模块）
+from auth_utils import USERS, current_user, role_required
 
-USERS = {
-    "admin": {
-        "password": "admin123",
-        "name": "系统管理员",
-        "role": "admin",
-        "role_name": "管理员",
-        "department": "训练中心",
-    },
-    "coach": {
-        "password": "user123",
-        "name": "教练用户",
-        "role": "coach",
-        "role_name": "普通用户",
-        "department": "一队教练组",
-    },
-}
+# 导入运动员信息管理模块 Blueprint
+from players import players_bp
+
 
 NAV_ITEMS = [
     {"label": "综合看板", "endpoint": "index", "roles": {"admin", "coach"}},
@@ -366,29 +355,8 @@ def create_app():
     def index():
         return render_template("index.html")
 
-    players_bp = Blueprint("players", __name__, url_prefix="/players")
-
-    @players_bp.route("/", endpoint="list")
-    @role_required("admin", "coach")
-    def players_list():
-        players, active_condition_count = filter_players(request.args)
-        return render_template(
-            "players/list.html",
-            players=players,
-            total_count=len(PLAYERS),
-            active_condition_count=active_condition_count,
-            logic=request.args.get("logic", "and"),
-        )
-
-    @players_bp.route("/create", endpoint="create")
-    @role_required("admin")
-    def players_create():
-        return module_page("新增运动员", "建立运动员基础档案，并同步纳入队伍训练管理体系。")
-
-    @players_bp.route("/<int:player_id>/edit", endpoint="edit")
-    @role_required("admin")
-    def players_edit(player_id):
-        return module_page("编辑运动员", f"维护编号 {player_id} 运动员的档案信息、竞技特征和健康状态。")
+    # 运动员信息管理模块已在 players.py 中定义，此处直接注册
+    app.register_blueprint(players_bp)
 
     training_bp = Blueprint("training", __name__, url_prefix="/training")
 
@@ -731,7 +699,6 @@ def create_app():
     def settings_dictionary():
         return module_page("系统配置", "维护系统基础参数、数据字典和导入模板规则。")
 
-    app.register_blueprint(players_bp)
     app.register_blueprint(training_bp)
     app.register_blueprint(injuries_bp)
     app.register_blueprint(fitness_bp)
@@ -1178,32 +1145,6 @@ def is_float_value(value):
         return True
     except ValueError:
         return False
-
-
-def current_user():
-    username = session.get("username")
-    if not username:
-        return None
-    user = USERS.get(username)
-    if not user:
-        return None
-    return {"username": username, **user}
-
-
-def role_required(*roles):
-    def decorator(view_func):
-        @wraps(view_func)
-        def wrapper(*args, **kwargs):
-            user = current_user()
-            if not user:
-                return redirect(url_for("login", next=request.path))
-            if user["role"] not in roles:
-                return render_template("auth/forbidden.html"), 403
-            return view_func(*args, **kwargs)
-
-        return wrapper
-
-    return decorator
 
 
 def module_page(module_name, module_desc):
