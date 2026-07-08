@@ -211,6 +211,75 @@ TRAINING_SYNC_LOGS = [
     },
 ]
 
+INJURY_RECORDS = [
+    {
+        "id": 1,
+        "athlete_id": 1,
+        "injury_date": "2026-05-10",
+        "injury_location": "右肩",
+        "injury_type": "肌肉拉伤",
+        "severity": "中度",
+        "diagnosis": "肩袖肌腱炎，建议理疗并减少高强度上肢训练。",
+        "treatment": "超声波理疗，弹力带康复训练。",
+        "recovery_status": "已恢复",
+        "expected_recovery_date": "2026-05-28",
+        "notes": "恢复后两周内控制发力训练量。",
+        "created_by": "coach",
+    },
+    {
+        "id": 2,
+        "athlete_id": 2,
+        "injury_date": "2026-06-22",
+        "injury_location": "右腕",
+        "injury_type": "过度使用疼痛",
+        "severity": "轻微",
+        "diagnosis": "腕部负荷偏高，击球后疼痛明显。",
+        "treatment": "冰敷、护腕保护，降低反手连续训练量。",
+        "recovery_status": "治疗中",
+        "expected_recovery_date": "2026-07-12",
+        "notes": "继续观察握拍稳定性。",
+        "created_by": "coach",
+    },
+    {
+        "id": 3,
+        "athlete_id": 3,
+        "injury_date": "2026-06-30",
+        "injury_location": "腰椎",
+        "injury_type": "椎间盘轻微突出",
+        "severity": "严重",
+        "diagnosis": "L4-L5椎间盘轻微突出，已停止高冲击训练。",
+        "treatment": "牵引、核心肌群康复训练，配合低强度步法恢复。",
+        "recovery_status": "康复中",
+        "expected_recovery_date": "2026-07-30",
+        "notes": "复训前需完成专项评估。",
+        "created_by": "admin",
+    },
+    {
+        "id": 4,
+        "athlete_id": 4,
+        "injury_date": "2026-06-15",
+        "injury_location": "左膝",
+        "injury_type": "韧带扭伤",
+        "severity": "严重",
+        "diagnosis": "左膝内侧副韧带二级扭伤，短期不适合对抗训练。",
+        "treatment": "制动休息、消肿处理、康复师指导活动度训练。",
+        "recovery_status": "治疗中",
+        "expected_recovery_date": "2026-07-20",
+        "notes": "禁止多球大范围移动训练。",
+        "created_by": "coach",
+    },
+]
+
+INJURY_SEVERITY_OPTIONS = ["轻微", "中度", "严重"]
+INJURY_RECOVERY_STATUS_OPTIONS = ["治疗中", "康复中", "已恢复"]
+
+ATHLETE_INJURY_STATUS_META = {
+    "健康": {"code": "healthy", "class": "success"},
+    "观察中": {"code": "observe", "class": "warning"},
+    "康复中": {"code": "rehab", "class": "info"},
+    "伤病中": {"code": "injured", "class": "danger"},
+}
+
 INTENSITY_LABELS = {
     "低": "低",
     "中": "中",
@@ -383,15 +452,53 @@ def create_app():
 
     injuries_bp = Blueprint("injuries", __name__, url_prefix="/injuries")
 
-    @injuries_bp.route("/", endpoint="list")
+    @injuries_bp.route("/", methods=["GET", "POST"], endpoint="list")
     @role_required("admin", "coach")
     def injuries_list():
-        return module_page("伤病记录管理", "维护运动员伤病档案，辅助教练组进行训练风险控制。")
+        if request.method == "POST":
+            try:
+                save_injury_record(request.form, current_user()["username"])
+                flash("伤病记录已保存，运动员健康状态已联动刷新。", "success")
+            except ValidationError as exc:
+                flash(str(exc), "warning")
+            except RuntimeError as exc:
+                flash(f"伤病登记失败，已回滚本次变更：{exc}", "danger")
+            return redirect(url_for("injuries.list", **build_injury_redirect_query(request.form)))
+
+        injury_records, active_condition_count = filter_injury_records(request.args)
+        editing_record = get_editing_injury_record(request.args.get("edit_id", "").strip())
+        summary = build_injury_summary(injury_records)
+        return render_template(
+            "injuries/list.html",
+            injury_records=injury_records,
+            active_condition_count=active_condition_count,
+            total_count=len(INJURY_RECORDS),
+            editing_record=editing_record,
+            athlete_choices=PLAYERS,
+            severity_options=INJURY_SEVERITY_OPTIONS,
+            recovery_status_options=INJURY_RECOVERY_STATUS_OPTIONS,
+            summary=summary,
+        )
 
     @injuries_bp.route("/player/<int:player_id>/history", endpoint="history")
     @role_required("admin", "coach")
     def injuries_history(player_id):
-        return module_page("历史伤病", f"查看编号 {player_id} 运动员的伤病历史、恢复过程和复训记录。")
+        player = next((item for item in PLAYERS if item["id"] == player_id), None)
+        if not player:
+            flash("所选运动员不存在，无法查看伤病历史。", "warning")
+            return redirect(url_for("players.list"))
+        records = [
+            enrich_injury_record(item)
+            for item in INJURY_RECORDS
+            if item["athlete_id"] == player_id
+        ]
+        records.sort(key=lambda item: (item["injury_date"], item["id"]), reverse=True)
+        return render_template(
+            "injuries/history.html",
+            player=player,
+            injury_records=records,
+            summary=build_injury_summary(records),
+        )
 
     fitness_bp = Blueprint("fitness", __name__, url_prefix="/fitness")
 
@@ -514,6 +621,242 @@ def filter_players(args):
 
 class ValidationError(Exception):
     pass
+
+
+def filter_injury_records(args):
+    predicates = []
+    player_keyword = args.get("player_keyword", "").strip().lower()
+    location_keyword = args.get("location_keyword", "").strip().lower()
+    severity = args.get("severity", "").strip()
+    recovery_status = args.get("recovery_status", "").strip()
+    date_from = args.get("date_from", "").strip()
+    date_to = args.get("date_to", "").strip()
+    active_only = args.get("active_only", "").strip()
+
+    if player_keyword:
+        predicates.append(
+            lambda record, value=player_keyword: value in record["player_name"].lower()
+            or value in record["student_no"].lower()
+        )
+    if location_keyword:
+        predicates.append(
+            lambda record, value=location_keyword: value in record["injury_location"].lower()
+            or value in record["injury_type"].lower()
+        )
+    if severity:
+        predicates.append(lambda record, value=severity: record["severity"] == value)
+    if recovery_status:
+        predicates.append(lambda record, value=recovery_status: record["recovery_status"] == value)
+    if date_from:
+        predicates.append(lambda record, value=date_from: record["injury_date"] >= value)
+    if date_to:
+        predicates.append(lambda record, value=date_to: record["injury_date"] <= value)
+    if active_only:
+        predicates.append(lambda record: record["recovery_status"] in {"治疗中", "康复中"})
+
+    records = [enrich_injury_record(item) for item in INJURY_RECORDS]
+    records.sort(key=lambda item: (item["injury_date"], item["id"]), reverse=True)
+    if not predicates:
+        return records, 0
+    return [record for record in records if all(check(record) for check in predicates)], len(predicates)
+
+
+def enrich_injury_record(record):
+    player = next((item for item in PLAYERS if item["id"] == record["athlete_id"]), None)
+    expected_date = record.get("expected_recovery_date") or ""
+    overdue = False
+    if expected_date and record["recovery_status"] != "已恢复":
+        overdue = expected_date < datetime.now().strftime("%Y-%m-%d")
+    base = dict(record)
+    base.update(
+        {
+            "player_name": player["name"] if player else "未知运动员",
+            "student_no": player["student_no"] if player else "-",
+            "level": (player.get("skill_level") or player.get("level")) if player else "-",
+            "player_injury_status": player["injury_status"] if player else "-",
+            "player_injury_status_code": player["injury_status_code"] if player else "healthy",
+            "severity_class": injury_severity_class(record["severity"]),
+            "recovery_class": injury_recovery_class(record["recovery_status"]),
+            "is_active": record["recovery_status"] in {"治疗中", "康复中"},
+            "is_overdue": overdue,
+        }
+    )
+    return base
+
+
+def injury_severity_class(severity):
+    return {
+        "轻微": "success",
+        "中度": "warning",
+        "严重": "danger",
+    }.get(severity, "secondary")
+
+
+def injury_recovery_class(recovery_status):
+    return {
+        "治疗中": "danger",
+        "康复中": "info",
+        "已恢复": "success",
+    }.get(recovery_status, "secondary")
+
+
+def build_injury_summary(records):
+    status_counts = {status: 0 for status in INJURY_RECOVERY_STATUS_OPTIONS}
+    location_counts = {}
+    active_count = 0
+    overdue_count = 0
+    serious_count = 0
+    for record in records:
+        status_counts[record["recovery_status"]] += 1
+        location_counts[record["injury_location"]] = location_counts.get(record["injury_location"], 0) + 1
+        if record["recovery_status"] in {"治疗中", "康复中"}:
+            active_count += 1
+        if record["is_overdue"]:
+            overdue_count += 1
+        if record["severity"] == "严重":
+            serious_count += 1
+
+    top_locations = sorted(location_counts.items(), key=lambda item: item[1], reverse=True)[:5]
+    return {
+        "record_count": len(records),
+        "active_count": active_count,
+        "treating_count": status_counts["治疗中"],
+        "rehab_count": status_counts["康复中"],
+        "recovered_count": status_counts["已恢复"],
+        "overdue_count": overdue_count,
+        "serious_count": serious_count,
+        "status_pie": [{"name": key, "value": value} for key, value in status_counts.items()],
+        "location_names": [item[0] for item in top_locations],
+        "location_counts": [item[1] for item in top_locations],
+    }
+
+
+def get_editing_injury_record(edit_id):
+    if not edit_id.isdigit():
+        return None
+    record = next((item for item in INJURY_RECORDS if item["id"] == int(edit_id)), None)
+    return enrich_injury_record(record) if record else None
+
+
+def save_injury_record(form, operator):
+    validated = validate_injury_form(form)
+    original_records = deepcopy(INJURY_RECORDS)
+    original_players = deepcopy(PLAYERS)
+    affected_athlete_ids = {validated["athlete_id"]}
+    try:
+        record_id = validated.pop("record_id")
+        if record_id:
+            target = next((item for item in INJURY_RECORDS if item["id"] == record_id), None)
+            if not target:
+                raise ValidationError("要修改的伤病记录不存在。")
+            affected_athlete_ids.add(target["athlete_id"])
+            target.update(validated)
+            target["created_by"] = operator
+        else:
+            INJURY_RECORDS.append(
+                {
+                    "id": next_id(INJURY_RECORDS),
+                    **validated,
+                    "created_by": operator,
+                }
+            )
+
+        for athlete_id in affected_athlete_ids:
+            refresh_athlete_injury_status(athlete_id)
+    except Exception:
+        INJURY_RECORDS[:] = original_records
+        PLAYERS[:] = original_players
+        raise
+
+
+def validate_injury_form(form):
+    record_id = form.get("record_id", "").strip()
+    athlete_id = parse_int_field(form.get("athlete_id", "").strip(), "运动员")
+    if not any(player["id"] == athlete_id for player in PLAYERS):
+        raise ValidationError("所选运动员不存在，请重新选择。")
+
+    injury_date = parse_date_field(form.get("injury_date", "").strip(), "伤病日期")
+    expected_recovery_date = form.get("expected_recovery_date", "").strip()
+    if expected_recovery_date:
+        expected_recovery_date = parse_date_field(expected_recovery_date, "预计恢复日期")
+        if expected_recovery_date < injury_date:
+            raise ValidationError("预计恢复日期不能早于伤病日期。")
+
+    injury_location = form.get("injury_location", "").strip()
+    if not injury_location:
+        raise ValidationError("伤病部位不能为空。")
+    if len(injury_location) > 50:
+        raise ValidationError("伤病部位不能超过 50 个字符。")
+
+    injury_type = form.get("injury_type", "").strip()
+    if not injury_type:
+        raise ValidationError("伤病类型不能为空。")
+    if len(injury_type) > 50:
+        raise ValidationError("伤病类型不能超过 50 个字符。")
+
+    severity = form.get("severity", "").strip()
+    if severity not in INJURY_SEVERITY_OPTIONS:
+        raise ValidationError("伤病程度非法，请从轻微、中度、严重中选择。")
+
+    recovery_status = form.get("recovery_status", "").strip()
+    if recovery_status not in INJURY_RECOVERY_STATUS_OPTIONS:
+        raise ValidationError("恢复状态非法，请从治疗中、康复中、已恢复中选择。")
+
+    diagnosis = form.get("diagnosis", "").strip()
+    treatment = form.get("treatment", "").strip()
+    notes = form.get("notes", "").strip()
+    for field_label, value, max_length in (
+        ("诊断说明", diagnosis, 180),
+        ("处理方案", treatment, 180),
+        ("备注", notes, 120),
+    ):
+        if len(value) > max_length:
+            raise ValidationError(f"{field_label}不能超过 {max_length} 个字符。")
+
+    return {
+        "record_id": int(record_id) if record_id.isdigit() else None,
+        "athlete_id": athlete_id,
+        "injury_date": injury_date,
+        "injury_location": injury_location,
+        "injury_type": injury_type,
+        "severity": severity,
+        "diagnosis": diagnosis,
+        "treatment": treatment,
+        "recovery_status": recovery_status,
+        "expected_recovery_date": expected_recovery_date,
+        "notes": notes,
+    }
+
+
+def refresh_athlete_injury_status(athlete_id):
+    player = next((item for item in PLAYERS if item["id"] == athlete_id), None)
+    if not player:
+        raise RuntimeError("无法刷新健康状态：运动员不存在。")
+
+    active_records = [
+        record for record in INJURY_RECORDS
+        if record["athlete_id"] == athlete_id
+        and record["recovery_status"] in {"治疗中", "康复中"}
+    ]
+    if any(record["recovery_status"] == "治疗中" and record["severity"] == "严重" for record in active_records):
+        status = "伤病中"
+    elif any(record["recovery_status"] == "治疗中" for record in active_records):
+        status = "观察中"
+    elif any(record["recovery_status"] == "康复中" for record in active_records):
+        status = "康复中"
+    else:
+        status = "健康"
+
+    status_meta = ATHLETE_INJURY_STATUS_META[status]
+    player["injury_status"] = status
+    player["injury_status_code"] = status_meta["code"]
+
+
+def build_injury_redirect_query(form):
+    edit_id = form.get("record_id", "").strip()
+    if edit_id:
+        return {"edit_id": edit_id}
+    return {}
 
 
 def filter_fitness_tests(args):
@@ -852,6 +1195,16 @@ def parse_float_range(value, field_name, min_value, max_value):
     if parsed < min_value or parsed > max_value:
         raise ValidationError(f"{field_name}必须介于 {min_value} 和 {max_value} 之间。")
     return round(parsed, 3)
+
+
+def parse_date_field(value, field_name):
+    if not value:
+        raise ValidationError(f"{field_name}不能为空。")
+    try:
+        datetime.strptime(value, "%Y-%m-%d")
+    except ValueError as exc:
+        raise ValidationError(f"{field_name}格式错误，请使用 YYYY-MM-DD。") from exc
+    return value
 
 
 def is_float_value(value):
