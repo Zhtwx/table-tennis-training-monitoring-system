@@ -953,6 +953,7 @@ def validate_training_plan_data(athlete_id, coach_id, plan_datetime, content, in
         errors.append("请填写完整信息（运动员、教练、日期、内容为必填）")
         return errors
 
+
     athlete = next((p for p in PLAYERS if str(p["id"]) == athlete_id), None)
     coach = next((c for c in COACHES if str(c["id"]) == coach_id), None)
     if not athlete:
@@ -992,7 +993,6 @@ def validate_training_plan_data(athlete_id, coach_id, plan_datetime, content, in
         errors.append("训练内容不能超过 500 个字符")
 
     return errors
-
 
 def filter_injury_records(args):
     predicates = []
@@ -1400,6 +1400,9 @@ def build_training_alerts(records):
                 }
             )
     return alerts[:6]
+
+
+
 def filter_fitness_tests(args):
     predicates = []
     player_keyword = args.get("player_keyword", "").strip().lower()
