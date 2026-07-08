@@ -1,3 +1,5 @@
+from copy import deepcopy
+from datetime import datetime
 from functools import wraps
 
 from flask import (
@@ -54,6 +56,7 @@ PLAYERS = [
         "gender": "男",
         "age": 19,
         "level": "一级运动员",
+        "skill_level": "一级运动员",
         "level_code": "first",
         "play_style": "右手横板快攻结合弧圈",
         "injury_status": "健康",
@@ -66,6 +69,7 @@ PLAYERS = [
         "gender": "女",
         "age": 18,
         "level": "二级运动员",
+        "skill_level": "二级运动员",
         "level_code": "second",
         "play_style": "左手横板两面弧圈",
         "injury_status": "观察中",
@@ -78,6 +82,7 @@ PLAYERS = [
         "gender": "男",
         "age": 21,
         "level": "国家级",
+        "skill_level": "国家级",
         "level_code": "national",
         "play_style": "右手直板近台快攻",
         "injury_status": "康复中",
@@ -90,12 +95,240 @@ PLAYERS = [
         "gender": "女",
         "age": 20,
         "level": "一级运动员",
+        "skill_level": "一级运动员",
         "level_code": "first",
         "play_style": "右手横板反手快拨",
         "injury_status": "伤病中",
         "injury_status_code": "injured",
     },
 ]
+
+COACHES = [
+    {"id": 1, "name": "陈指导", "specialty": "技术训练"},
+    {"id": 2, "name": "刘指导", "specialty": "体能训练"},
+    {"id": 3, "name": "马指导", "specialty": "战术分析"},
+]
+
+FITNESS_TESTS = [
+    {
+        "id": 1,
+        "athlete_id": 1,
+        "test_date": "2026-06-03",
+        "tester_id": 2,
+        "upper_strength": 84.0,
+        "lower_strength": 88.0,
+        "flexibility": 82.0,
+        "endurance": 86.0,
+        "speed": 91.0,
+        "overall_score": 86.2,
+        "notes": "训练状态稳定，体能结构均衡。",
+        "created_by": "coach",
+    },
+    {
+        "id": 2,
+        "athlete_id": 2,
+        "test_date": "2026-06-11",
+        "tester_id": 2,
+        "upper_strength": 76.0,
+        "lower_strength": 78.0,
+        "flexibility": 74.0,
+        "endurance": 79.0,
+        "speed": 73.0,
+        "overall_score": 76.0,
+        "notes": "速度指标偏低，建议增加敏捷与启动练习。",
+        "created_by": "coach",
+    },
+    {
+        "id": 3,
+        "athlete_id": 3,
+        "test_date": "2026-06-18",
+        "tester_id": 2,
+        "upper_strength": 82.0,
+        "lower_strength": 84.0,
+        "flexibility": 68.0,
+        "endurance": 81.0,
+        "speed": 76.0,
+        "overall_score": 78.2,
+        "notes": "柔韧性偏低，需加强拉伸和恢复。",
+        "created_by": "admin",
+    },
+    {
+        "id": 4,
+        "athlete_id": 4,
+        "test_date": "2026-07-02",
+        "tester_id": 2,
+        "upper_strength": 70.0,
+        "lower_strength": 66.0,
+        "flexibility": 58.0,
+        "endurance": 69.0,
+        "speed": 64.0,
+        "overall_score": 65.4,
+        "notes": "恢复期指标偏弱，维持低强度过渡方案。",
+        "created_by": "coach",
+    },
+]
+
+TRAINING_SYNC_LOGS = [
+    {
+        "id": 1,
+        "fitness_test_id": 1,
+        "athlete_id": 1,
+        "coach_id": 2,
+        "sync_date": "2026-06-03",
+        "plan_name": "体能巩固训练",
+        "hours": 16.0,
+        "intensity": "中",
+        "status": "已完成",
+    },
+    {
+        "id": 2,
+        "fitness_test_id": 2,
+        "athlete_id": 2,
+        "coach_id": 2,
+        "sync_date": "2026-06-11",
+        "plan_name": "速度敏捷提升",
+        "hours": 18.0,
+        "intensity": "中",
+        "status": "已完成",
+    },
+    {
+        "id": 3,
+        "fitness_test_id": 3,
+        "athlete_id": 3,
+        "coach_id": 2,
+        "sync_date": "2026-06-18",
+        "plan_name": "恢复拉伸结合耐力课",
+        "hours": 20.0,
+        "intensity": "高",
+        "status": "进行中",
+    },
+    {
+        "id": 4,
+        "fitness_test_id": 4,
+        "athlete_id": 4,
+        "coach_id": 2,
+        "sync_date": "2026-07-02",
+        "plan_name": "康复过渡训练",
+        "hours": 12.0,
+        "intensity": "低",
+        "status": "进行中",
+    },
+]
+
+INJURY_RECORDS = [
+    {
+        "id": 1,
+        "athlete_id": 1,
+        "injury_date": "2026-05-10",
+        "injury_location": "右肩",
+        "injury_type": "肌肉拉伤",
+        "severity": "中度",
+        "diagnosis": "肩袖肌腱炎，建议理疗并减少高强度上肢训练。",
+        "treatment": "超声波理疗，弹力带康复训练。",
+        "recovery_status": "已恢复",
+        "expected_recovery_date": "2026-05-28",
+        "notes": "恢复后两周内控制发力训练量。",
+        "created_by": "coach",
+        "is_deleted": False,
+        "deleted_by": "",
+        "deleted_at": "",
+        "delete_reason": "",
+    },
+    {
+        "id": 2,
+        "athlete_id": 2,
+        "injury_date": "2026-06-22",
+        "injury_location": "右腕",
+        "injury_type": "过度使用疼痛",
+        "severity": "轻微",
+        "diagnosis": "腕部负荷偏高，击球后疼痛明显。",
+        "treatment": "冰敷、护腕保护，降低反手连续训练量。",
+        "recovery_status": "治疗中",
+        "expected_recovery_date": "2026-07-12",
+        "notes": "继续观察握拍稳定性。",
+        "created_by": "coach",
+        "is_deleted": False,
+        "deleted_by": "",
+        "deleted_at": "",
+        "delete_reason": "",
+    },
+    {
+        "id": 3,
+        "athlete_id": 3,
+        "injury_date": "2026-06-30",
+        "injury_location": "腰椎",
+        "injury_type": "椎间盘轻微突出",
+        "severity": "严重",
+        "diagnosis": "L4-L5椎间盘轻微突出，已停止高冲击训练。",
+        "treatment": "牵引、核心肌群康复训练，配合低强度步法恢复。",
+        "recovery_status": "康复中",
+        "expected_recovery_date": "2026-07-30",
+        "notes": "复训前需完成专项评估。",
+        "created_by": "admin",
+        "is_deleted": False,
+        "deleted_by": "",
+        "deleted_at": "",
+        "delete_reason": "",
+    },
+    {
+        "id": 4,
+        "athlete_id": 4,
+        "injury_date": "2026-06-15",
+        "injury_location": "左膝",
+        "injury_type": "韧带扭伤",
+        "severity": "严重",
+        "diagnosis": "左膝内侧副韧带二级扭伤，短期不适合对抗训练。",
+        "treatment": "制动休息、消肿处理、康复师指导活动度训练。",
+        "recovery_status": "治疗中",
+        "expected_recovery_date": "2026-07-20",
+        "notes": "禁止多球大范围移动训练。",
+        "created_by": "coach",
+        "is_deleted": False,
+        "deleted_by": "",
+        "deleted_at": "",
+        "delete_reason": "",
+    },
+]
+
+INJURY_FOLLOWUPS = [
+    {
+        "id": 1,
+        "injury_record_id": 2,
+        "followup_date": "2026-07-02",
+        "pain_score": 3,
+        "training_limit": "避免连续反手发力，单次训练不超过 60 分钟。",
+        "advice": "继续冰敷和护腕保护，三天后复查握拍疼痛。",
+        "reviewer": "刘指导",
+        "created_by": "coach",
+    },
+    {
+        "id": 2,
+        "injury_record_id": 3,
+        "followup_date": "2026-07-05",
+        "pain_score": 4,
+        "training_limit": "禁止高冲击步法和大幅度侧身进攻。",
+        "advice": "保持核心稳定训练，复训前完成腰椎活动度评估。",
+        "reviewer": "陈指导",
+        "created_by": "admin",
+    },
+]
+
+INJURY_SEVERITY_OPTIONS = ["轻微", "中度", "严重"]
+INJURY_RECOVERY_STATUS_OPTIONS = ["治疗中", "康复中", "已恢复"]
+
+ATHLETE_INJURY_STATUS_META = {
+    "健康": {"code": "healthy", "class": "success"},
+    "观察中": {"code": "observe", "class": "warning"},
+    "康复中": {"code": "rehab", "class": "info"},
+    "伤病中": {"code": "injured", "class": "danger"},
+}
+
+INTENSITY_LABELS = {
+    "低": "低",
+    "中": "中",
+    "高": "高",
+    "极高": "极高",
+}
 
 MODULE_FEATURES = {
     "训练计划管理": [
@@ -358,22 +591,103 @@ def create_app():
 
     injuries_bp = Blueprint("injuries", __name__, url_prefix="/injuries")
 
-    @injuries_bp.route("/", endpoint="list")
+    @injuries_bp.route("/", methods=["GET", "POST"], endpoint="list")
     @role_required("admin", "coach")
     def injuries_list():
-        return module_page("伤病记录管理", "维护运动员伤病档案，辅助教练组进行训练风险控制。")
+        if request.method == "POST":
+            action = request.form.get("action", "save").strip()
+            try:
+                if action == "save":
+                    save_injury_record(request.form, current_user())
+                    flash("伤病记录已保存，运动员健康状态已联动刷新。", "success")
+                elif action == "archive":
+                    archive_injury_record(request.form, current_user())
+                    flash("伤病记录已作废归档，运动员健康状态已重新计算。", "success")
+                elif action == "followup":
+                    save_injury_followup(request.form, current_user())
+                    flash("复诊跟踪记录已保存。", "success")
+                else:
+                    raise ValidationError("未知操作类型，请刷新页面后重试。")
+            except ValidationError as exc:
+                flash(str(exc), "warning")
+            except RuntimeError as exc:
+                flash(f"伤病模块操作失败，已回滚本次变更：{exc}", "danger")
+            return redirect(url_for("injuries.list", **build_injury_redirect_query(request.form)))
+
+        injury_records, active_condition_count, query_errors = filter_injury_records(request.args)
+        for error in query_errors:
+            flash(error, "warning")
+        editing_record = get_editing_injury_record(request.args.get("edit_id", "").strip())
+        summary = build_injury_summary(injury_records)
+        return render_template(
+            "injuries/list.html",
+            injury_records=injury_records,
+            active_condition_count=active_condition_count,
+            total_count=len(INJURY_RECORDS),
+            editing_record=editing_record,
+            athlete_choices=PLAYERS,
+            severity_options=INJURY_SEVERITY_OPTIONS,
+            recovery_status_options=INJURY_RECOVERY_STATUS_OPTIONS,
+            summary=summary,
+            training_alerts=build_training_alerts(injury_records),
+        )
 
     @injuries_bp.route("/player/<int:player_id>/history", endpoint="history")
     @role_required("admin", "coach")
     def injuries_history(player_id):
-        return module_page("历史伤病", f"查看编号 {player_id} 运动员的伤病历史、恢复过程和复训记录。")
+        player = next((item for item in PLAYERS if item["id"] == player_id), None)
+        if not player:
+            flash("所选运动员不存在，无法查看伤病历史。", "warning")
+            return redirect(url_for("players.list"))
+        records = [
+            enrich_injury_record(item)
+            for item in INJURY_RECORDS
+            if item["athlete_id"] == player_id
+        ]
+        records.sort(key=lambda item: (item["injury_date"], item["id"]), reverse=True)
+        return render_template(
+            "injuries/history.html",
+            player=player,
+            injury_records=records,
+            summary=build_injury_summary(records),
+            followups_by_record=group_followups_by_record(),
+        )
 
     fitness_bp = Blueprint("fitness", __name__, url_prefix="/fitness")
 
-    @fitness_bp.route("/tests", endpoint="tests")
+    @fitness_bp.route("/tests", methods=["GET", "POST"], endpoint="tests")
     @role_required("admin", "coach")
     def fitness_tests():
-        return module_page("体能测试评估", "管理体能测试指标，形成阶段性能力评估。")
+        if request.method == "POST":
+            try:
+                save_fitness_test(request.form, current_user()["username"])
+                flash("体能测试记录已提交，训练数据已与体能数据同步写入。", "success")
+            except ValidationError as exc:
+                flash(str(exc), "warning")
+            except RuntimeError as exc:
+                flash(f"事务已回滚：{exc}", "danger")
+            return redirect(url_for("fitness.tests", **build_redirect_query(request.form)))
+
+        fitness_records, active_condition_count = filter_fitness_tests(request.args)
+        editing_record = get_editing_fitness_record(request.args.get("edit_id", "").strip())
+        summary = build_fitness_summary(fitness_records)
+        return render_template(
+            "fitness/tests.html",
+            fitness_records=fitness_records,
+            active_condition_count=active_condition_count,
+            total_count=len(FITNESS_TESTS),
+            editing_record=editing_record,
+            athlete_choices=PLAYERS,
+            coach_choices=COACHES,
+            summary=summary,
+            risk_options=[
+                {"code": "stable", "label": "稳定"},
+                {"code": "observe", "label": "观察"},
+                {"code": "alert", "label": "预警"},
+            ],
+            intensity_options=INTENSITY_LABELS,
+            plan_status_options=["进行中", "已完成", "已取消"],
+        )
 
     rehab_bp = Blueprint("rehab", __name__, url_prefix="/rehab")
 
@@ -456,6 +770,787 @@ def filter_players(args):
         return [player for player in PLAYERS if any(check(player) for check in predicates)], len(predicates)
 
     return [player for player in PLAYERS if all(check(player) for check in predicates)], len(predicates)
+
+
+class ValidationError(Exception):
+    pass
+
+
+def filter_injury_records(args):
+    predicates = []
+    query_errors = []
+    player_keyword = args.get("player_keyword", "").strip().lower()
+    location_keyword = args.get("location_keyword", "").strip().lower()
+    severity = args.get("severity", "").strip()
+    recovery_status = args.get("recovery_status", "").strip()
+    date_from = parse_optional_query_date(args.get("date_from", "").strip(), "开始日期", query_errors)
+    date_to = parse_optional_query_date(args.get("date_to", "").strip(), "结束日期", query_errors)
+    active_only = args.get("active_only", "").strip()
+    show_archived = args.get("show_archived", "").strip()
+
+    if player_keyword:
+        predicates.append(
+            lambda record, value=player_keyword: value in record["player_name"].lower()
+            or value in record["student_no"].lower()
+        )
+    if location_keyword:
+        predicates.append(
+            lambda record, value=location_keyword: value in record["injury_location"].lower()
+            or value in record["injury_type"].lower()
+        )
+    if severity:
+        if severity in INJURY_SEVERITY_OPTIONS:
+            predicates.append(lambda record, value=severity: record["severity"] == value)
+        else:
+            query_errors.append("伤病程度筛选条件非法，已忽略该条件。")
+    if recovery_status:
+        if recovery_status in INJURY_RECOVERY_STATUS_OPTIONS:
+            predicates.append(lambda record, value=recovery_status: record["recovery_status"] == value)
+        else:
+            query_errors.append("恢复状态筛选条件非法，已忽略该条件。")
+    if date_from and date_to and date_from > date_to:
+        query_errors.append("开始日期不能晚于结束日期，已忽略日期范围条件。")
+        date_from = ""
+        date_to = ""
+    if date_from:
+        predicates.append(lambda record, value=date_from: record["injury_date"] >= value)
+    if date_to:
+        predicates.append(lambda record, value=date_to: record["injury_date"] <= value)
+    if active_only:
+        predicates.append(lambda record: record["recovery_status"] in {"治疗中", "康复中"})
+
+    source_records = INJURY_RECORDS if show_archived else [
+        item for item in INJURY_RECORDS if not item.get("is_deleted")
+    ]
+    records = [enrich_injury_record(item) for item in source_records]
+    records.sort(key=lambda item: (item["injury_date"], item["id"]), reverse=True)
+    if not predicates:
+        return records, 0, query_errors
+    return [record for record in records if all(check(record) for check in predicates)], len(predicates), query_errors
+
+
+def enrich_injury_record(record):
+    player = next((item for item in PLAYERS if item["id"] == record["athlete_id"]), None)
+    expected_date = record.get("expected_recovery_date") or ""
+    overdue = False
+    if expected_date and record["recovery_status"] != "已恢复":
+        overdue = expected_date < datetime.now().strftime("%Y-%m-%d")
+    base = dict(record)
+    base.update(
+        {
+            "player_name": player["name"] if player else "未知运动员",
+            "student_no": player["student_no"] if player else "-",
+            "level": (player.get("skill_level") or player.get("level")) if player else "-",
+            "player_injury_status": player["injury_status"] if player else "-",
+            "player_injury_status_code": player["injury_status_code"] if player else "healthy",
+            "severity_class": injury_severity_class(record["severity"]),
+            "recovery_class": injury_recovery_class(record["recovery_status"]),
+            "is_active": record["recovery_status"] in {"治疗中", "康复中"},
+            "is_overdue": overdue,
+            "followup_count": count_followups(record["id"]),
+            "latest_followup": latest_followup(record["id"]),
+            "training_alert": build_training_alert_for_record(record),
+        }
+    )
+    return base
+
+
+def injury_severity_class(severity):
+    return {
+        "轻微": "success",
+        "中度": "warning",
+        "严重": "danger",
+    }.get(severity, "secondary")
+
+
+def injury_recovery_class(recovery_status):
+    return {
+        "治疗中": "danger",
+        "康复中": "info",
+        "已恢复": "success",
+    }.get(recovery_status, "secondary")
+
+
+def build_injury_summary(records):
+    status_counts = {status: 0 for status in INJURY_RECOVERY_STATUS_OPTIONS}
+    location_counts = {}
+    active_count = 0
+    overdue_count = 0
+    serious_count = 0
+    for record in records:
+        status_counts[record["recovery_status"]] += 1
+        location_counts[record["injury_location"]] = location_counts.get(record["injury_location"], 0) + 1
+        if record["recovery_status"] in {"治疗中", "康复中"}:
+            active_count += 1
+        if record["is_overdue"]:
+            overdue_count += 1
+        if record["severity"] == "严重":
+            serious_count += 1
+
+    top_locations = sorted(location_counts.items(), key=lambda item: item[1], reverse=True)[:5]
+    return {
+        "record_count": len(records),
+        "active_count": active_count,
+        "treating_count": status_counts["治疗中"],
+        "rehab_count": status_counts["康复中"],
+        "recovered_count": status_counts["已恢复"],
+        "overdue_count": overdue_count,
+        "serious_count": serious_count,
+        "status_pie": [{"name": key, "value": value} for key, value in status_counts.items()],
+        "location_names": [item[0] for item in top_locations],
+        "location_counts": [item[1] for item in top_locations],
+    }
+
+
+def get_editing_injury_record(edit_id):
+    if not edit_id.isdigit():
+        return None
+    record = next(
+        (item for item in INJURY_RECORDS if item["id"] == int(edit_id) and not item.get("is_deleted")),
+        None,
+    )
+    return enrich_injury_record(record) if record else None
+
+
+def save_injury_record(form, user):
+    validated = validate_injury_form(form)
+    enforce_injury_write_permission(validated, user)
+    original_records = deepcopy(INJURY_RECORDS)
+    original_players = deepcopy(PLAYERS)
+    affected_athlete_ids = {validated["athlete_id"]}
+    try:
+        record_id = validated.pop("record_id")
+        if record_id:
+            target = next(
+                (item for item in INJURY_RECORDS if item["id"] == record_id and not item.get("is_deleted")),
+                None,
+            )
+            if not target:
+                raise ValidationError("要修改的伤病记录不存在。")
+            affected_athlete_ids.add(target["athlete_id"])
+            target.update(validated)
+            target["created_by"] = user["username"]
+        else:
+            INJURY_RECORDS.append(
+                {
+                    "id": next_id(INJURY_RECORDS),
+                    **validated,
+                    "created_by": user["username"],
+                    "is_deleted": False,
+                    "deleted_by": "",
+                    "deleted_at": "",
+                    "delete_reason": "",
+                }
+            )
+
+        for athlete_id in affected_athlete_ids:
+            refresh_athlete_injury_status(athlete_id)
+    except Exception:
+        INJURY_RECORDS[:] = original_records
+        PLAYERS[:] = original_players
+        raise
+
+
+def archive_injury_record(form, user):
+    if user["role"] != "admin":
+        raise ValidationError("只有管理员可以作废归档伤病记录。")
+    record_id = parse_int_field(form.get("archive_record_id", "").strip(), "伤病记录")
+    reason = form.get("delete_reason", "").strip()
+    if not reason:
+        raise ValidationError("作废原因不能为空。")
+    if len(reason) > 120:
+        raise ValidationError("作废原因不能超过 120 个字符。")
+
+    original_records = deepcopy(INJURY_RECORDS)
+    original_players = deepcopy(PLAYERS)
+    try:
+        target = next(
+            (item for item in INJURY_RECORDS if item["id"] == record_id and not item.get("is_deleted")),
+            None,
+        )
+        if not target:
+            raise ValidationError("要作废的伤病记录不存在或已归档。")
+        target["is_deleted"] = True
+        target["deleted_by"] = user["username"]
+        target["deleted_at"] = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+        target["delete_reason"] = reason
+        refresh_athlete_injury_status(target["athlete_id"])
+    except Exception:
+        INJURY_RECORDS[:] = original_records
+        PLAYERS[:] = original_players
+        raise
+
+
+def save_injury_followup(form, user):
+    record_id = parse_int_field(form.get("followup_record_id", "").strip(), "伤病记录")
+    target = next(
+        (item for item in INJURY_RECORDS if item["id"] == record_id and not item.get("is_deleted")),
+        None,
+    )
+    if not target:
+        raise ValidationError("要跟踪的伤病记录不存在或已归档。")
+
+    followup_date = parse_date_field(form.get("followup_date", "").strip(), "复诊日期")
+    if followup_date < target["injury_date"]:
+        raise ValidationError("复诊日期不能早于伤病日期。")
+    pain_score = parse_int_range(form.get("pain_score", "").strip(), "疼痛评分", 0, 10)
+    training_limit = form.get("training_limit", "").strip()
+    advice = form.get("advice", "").strip()
+    reviewer = form.get("reviewer", "").strip()
+
+    for field_label, value, max_length in (
+        ("训练限制", training_limit, 160),
+        ("复诊建议", advice, 160),
+        ("复诊人", reviewer, 30),
+    ):
+        if not value:
+            raise ValidationError(f"{field_label}不能为空。")
+        if len(value) > max_length:
+            raise ValidationError(f"{field_label}不能超过 {max_length} 个字符。")
+
+    INJURY_FOLLOWUPS.append(
+        {
+            "id": next_id(INJURY_FOLLOWUPS),
+            "injury_record_id": record_id,
+            "followup_date": followup_date,
+            "pain_score": pain_score,
+            "training_limit": training_limit,
+            "advice": advice,
+            "reviewer": reviewer,
+            "created_by": user["username"],
+        }
+    )
+
+
+def validate_injury_form(form):
+    record_id = form.get("record_id", "").strip()
+    if record_id and not record_id.isdigit():
+        raise ValidationError("伤病记录编号非法，请从列表中选择要修改的记录。")
+    athlete_id = parse_int_field(form.get("athlete_id", "").strip(), "运动员")
+    if not any(player["id"] == athlete_id for player in PLAYERS):
+        raise ValidationError("所选运动员不存在，请重新选择。")
+
+    injury_date = parse_date_field(form.get("injury_date", "").strip(), "伤病日期")
+    expected_recovery_date = form.get("expected_recovery_date", "").strip()
+    if expected_recovery_date:
+        expected_recovery_date = parse_date_field(expected_recovery_date, "预计恢复日期")
+        if expected_recovery_date < injury_date:
+            raise ValidationError("预计恢复日期不能早于伤病日期。")
+
+    injury_location = form.get("injury_location", "").strip()
+    if not injury_location:
+        raise ValidationError("伤病部位不能为空。")
+    if len(injury_location) > 50:
+        raise ValidationError("伤病部位不能超过 50 个字符。")
+
+    injury_type = form.get("injury_type", "").strip()
+    if not injury_type:
+        raise ValidationError("伤病类型不能为空。")
+    if len(injury_type) > 50:
+        raise ValidationError("伤病类型不能超过 50 个字符。")
+
+    severity = form.get("severity", "").strip()
+    if severity not in INJURY_SEVERITY_OPTIONS:
+        raise ValidationError("伤病程度非法，请从轻微、中度、严重中选择。")
+
+    recovery_status = form.get("recovery_status", "").strip()
+    if recovery_status not in INJURY_RECOVERY_STATUS_OPTIONS:
+        raise ValidationError("恢复状态非法，请从治疗中、康复中、已恢复中选择。")
+
+    diagnosis = form.get("diagnosis", "").strip()
+    treatment = form.get("treatment", "").strip()
+    notes = form.get("notes", "").strip()
+    for field_label, value, max_length in (
+        ("诊断说明", diagnosis, 180),
+        ("处理方案", treatment, 180),
+        ("备注", notes, 120),
+    ):
+        if len(value) > max_length:
+            raise ValidationError(f"{field_label}不能超过 {max_length} 个字符。")
+
+    if recovery_status == "已恢复" and not expected_recovery_date:
+        expected_recovery_date = injury_date
+
+    return {
+        "record_id": int(record_id) if record_id.isdigit() else None,
+        "athlete_id": athlete_id,
+        "injury_date": injury_date,
+        "injury_location": injury_location,
+        "injury_type": injury_type,
+        "severity": severity,
+        "diagnosis": diagnosis,
+        "treatment": treatment,
+        "recovery_status": recovery_status,
+        "expected_recovery_date": expected_recovery_date,
+        "notes": notes,
+    }
+
+
+def enforce_injury_write_permission(validated, user):
+    if user["role"] == "admin":
+        return
+    if validated["record_id"]:
+        raise ValidationError("普通教练只能新增伤病记录，修改记录需管理员处理。")
+    if validated["severity"] == "严重":
+        raise ValidationError("严重伤病需管理员确认后登记。")
+    if validated["recovery_status"] == "已恢复":
+        raise ValidationError("恢复完成状态需管理员确认。")
+
+
+def refresh_athlete_injury_status(athlete_id):
+    player = next((item for item in PLAYERS if item["id"] == athlete_id), None)
+    if not player:
+        raise RuntimeError("无法刷新健康状态：运动员不存在。")
+
+    active_records = [
+        record for record in INJURY_RECORDS
+        if record["athlete_id"] == athlete_id
+        and not record.get("is_deleted")
+        and record["recovery_status"] in {"治疗中", "康复中"}
+    ]
+    if any(record["recovery_status"] == "治疗中" and record["severity"] == "严重" for record in active_records):
+        status = "伤病中"
+    elif any(record["recovery_status"] == "治疗中" for record in active_records):
+        status = "观察中"
+    elif any(record["recovery_status"] == "康复中" for record in active_records):
+        status = "康复中"
+    else:
+        status = "健康"
+
+    status_meta = ATHLETE_INJURY_STATUS_META[status]
+    player["injury_status"] = status
+    player["injury_status_code"] = status_meta["code"]
+
+
+def build_injury_redirect_query(form):
+    edit_id = form.get("record_id", "").strip()
+    if edit_id:
+        return {"edit_id": edit_id}
+    return {}
+
+
+def group_followups_by_record():
+    grouped = {}
+    for followup in sorted(
+        INJURY_FOLLOWUPS,
+        key=lambda item: (item["followup_date"], item["id"]),
+        reverse=True,
+    ):
+        grouped.setdefault(followup["injury_record_id"], []).append(followup)
+    return grouped
+
+
+def count_followups(record_id):
+    return sum(1 for item in INJURY_FOLLOWUPS if item["injury_record_id"] == record_id)
+
+
+def latest_followup(record_id):
+    items = [
+        item for item in INJURY_FOLLOWUPS
+        if item["injury_record_id"] == record_id
+    ]
+    if not items:
+        return None
+    return sorted(items, key=lambda item: (item["followup_date"], item["id"]), reverse=True)[0]
+
+
+def build_training_alert_for_record(record):
+    if record.get("is_deleted") or record["recovery_status"] == "已恢复":
+        return ""
+    if record["severity"] == "严重" and record["recovery_status"] == "治疗中":
+        return "禁止高强度和对抗训练，需调整为康复或休训方案。"
+    if record["recovery_status"] == "治疗中":
+        return "避免高负荷专项训练，训练计划需降低强度。"
+    if record["recovery_status"] == "康复中":
+        return "仅安排低到中等强度过渡训练，复训前保留评估。"
+    return ""
+
+
+def build_training_alerts(records):
+    alerts = []
+    for record in records:
+        alert = record.get("training_alert") or build_training_alert_for_record(record)
+        if alert:
+            alerts.append(
+                {
+                    "record_id": record["id"],
+                    "player_name": record["player_name"],
+                    "injury_location": record["injury_location"],
+                    "severity": record["severity"],
+                    "recovery_status": record["recovery_status"],
+                    "alert": alert,
+                }
+            )
+    return alerts[:6]
+
+
+def filter_fitness_tests(args):
+    predicates = []
+    player_keyword = args.get("player_keyword", "").strip().lower()
+    date_from = args.get("date_from", "").strip()
+    date_to = args.get("date_to", "").strip()
+    risk_level = args.get("risk_level", "").strip()
+    intensity = args.get("intensity", "").strip()
+    score_min = args.get("score_min", "").strip()
+    lower_strength_min = args.get("lower_strength_min", "").strip()
+    speed_min = args.get("speed_min", "").strip()
+
+    if player_keyword:
+        predicates.append(
+            lambda record, value=player_keyword: value in record["player_name"].lower()
+            or value in record["student_no"].lower()
+        )
+    if date_from:
+        predicates.append(lambda record, value=date_from: record["test_date"] >= value)
+    if date_to:
+        predicates.append(lambda record, value=date_to: record["test_date"] <= value)
+    if risk_level:
+        predicates.append(lambda record, value=risk_level: record["risk_code"] == value)
+    if intensity:
+        predicates.append(lambda record, value=intensity: record["plan_intensity"] == value)
+    if is_float_value(score_min):
+        predicates.append(lambda record, value=float(score_min): record["overall_score"] >= value)
+    if is_float_value(lower_strength_min):
+        predicates.append(lambda record, value=float(lower_strength_min): record["lower_strength"] >= value)
+    if is_float_value(speed_min):
+        predicates.append(lambda record, value=float(speed_min): record["speed"] >= value)
+
+    records = [enrich_fitness_record(item) for item in FITNESS_TESTS]
+    records.sort(key=lambda item: (item["test_date"], item["id"]), reverse=True)
+    if not predicates:
+        return records, 0
+    filtered = [record for record in records if all(check(record) for check in predicates)]
+    return filtered, len(predicates)
+
+
+def enrich_fitness_record(record):
+    player = next((item for item in PLAYERS if item["id"] == record["athlete_id"]), None)
+    coach = next((item for item in COACHES if item["id"] == record["tester_id"]), None)
+    sync_plan = next((item for item in TRAINING_SYNC_LOGS if item["fitness_test_id"] == record["id"]), None)
+    risk = evaluate_fitness_risk(record)
+    score = calculate_fitness_score(record)
+    upper_strength_status = classify_metric_status(record["upper_strength"], 70, 80, lower_is_worse=True)
+    lower_strength_status = classify_metric_status(record["lower_strength"], 70, 80, lower_is_worse=True)
+    flexibility_status = classify_metric_status(record["flexibility"], 70, 80, lower_is_worse=True)
+    endurance_status = classify_metric_status(record["endurance"], 75, 85, lower_is_worse=True)
+    speed_status = classify_metric_status(record["speed"], 75, 85, lower_is_worse=True)
+    base = dict(record)
+    base.update(
+        {
+            "player_name": player["name"] if player else "未知运动员",
+            "student_no": player["student_no"] if player else "-",
+            "level": (player.get("skill_level") or player.get("level")) if player else "-",
+            "tester_name": coach["name"] if coach else "未指定",
+            "risk_code": risk["code"],
+            "risk_label": risk["label"],
+            "risk_class": risk["class"],
+            "fitness_score": score,
+            "upper_strength_status": upper_strength_status,
+            "lower_strength_status": lower_strength_status,
+            "flexibility_status": flexibility_status,
+            "endurance_status": endurance_status,
+            "speed_status": speed_status,
+            "plan_name": sync_plan["plan_name"] if sync_plan else "-",
+            "plan_hours": sync_plan["hours"] if sync_plan else 0,
+            "plan_intensity": sync_plan["intensity"] if sync_plan else "",
+            "plan_status": sync_plan["status"] if sync_plan else "-",
+        }
+    )
+    return base
+
+
+def evaluate_fitness_risk(record):
+    alerts = 0
+    observes = 0
+    if record["upper_strength"] < 70:
+        alerts += 1
+    elif record["upper_strength"] < 80:
+        observes += 1
+    if record["lower_strength"] < 70:
+        alerts += 1
+    elif record["lower_strength"] < 80:
+        observes += 1
+    if record["flexibility"] < 70:
+        alerts += 1
+    elif record["flexibility"] < 80:
+        observes += 1
+    if record["endurance"] < 75:
+        alerts += 1
+    elif record["endurance"] < 85:
+        observes += 1
+    if record["speed"] < 75:
+        alerts += 1
+    elif record["speed"] < 85:
+        observes += 1
+    if alerts >= 2:
+        return {"code": "alert", "label": "预警", "class": "danger"}
+    if alerts == 1 or observes >= 2:
+        return {"code": "observe", "label": "观察", "class": "warning"}
+    return {"code": "stable", "label": "稳定", "class": "success"}
+
+
+def calculate_fitness_score(record):
+    score = (
+        record["upper_strength"]
+        + record["lower_strength"]
+        + record["flexibility"]
+        + record["endurance"]
+        + record["speed"]
+    ) / 5
+    return round(score, 1)
+
+
+def classify_metric_status(value, alert_threshold, observe_threshold, *, lower_is_worse):
+    if lower_is_worse:
+        if value < alert_threshold:
+            return "alert"
+        if value < observe_threshold:
+            return "observe"
+        return "normal"
+    if value > alert_threshold:
+        return "alert"
+    if value > observe_threshold:
+        return "observe"
+    return "normal"
+
+
+def build_fitness_summary(records):
+    risk_counts = {"稳定": 0, "观察": 0, "预警": 0}
+    monthly_map = {}
+    player_map = {}
+    for record in records:
+        risk_counts[record["risk_label"]] += 1
+        month_key = record["test_date"][:7]
+        monthly_stats = monthly_map.setdefault(
+            month_key,
+            {"score_total": 0.0, "speed_total": 0.0, "hours_total": 0.0, "count": 0},
+        )
+        monthly_stats["score_total"] += record["fitness_score"]
+        monthly_stats["speed_total"] += record["speed"]
+        monthly_stats["hours_total"] += record["plan_hours"]
+        monthly_stats["count"] += 1
+
+        player_stats = player_map.setdefault(record["player_name"], {"score_total": 0.0, "count": 0})
+        player_stats["score_total"] += record["fitness_score"]
+        player_stats["count"] += 1
+
+    month_labels = sorted(monthly_map.keys())
+    monthly_scores = [round(monthly_map[key]["score_total"] / monthly_map[key]["count"], 1) for key in month_labels]
+    monthly_speed = [round(monthly_map[key]["speed_total"] / monthly_map[key]["count"], 1) for key in month_labels]
+    monthly_hours = [round(monthly_map[key]["hours_total"], 1) for key in month_labels]
+
+    player_scores = sorted(
+        (
+            {
+                "name": name,
+                "score": round(stats["score_total"] / stats["count"], 1),
+            }
+            for name, stats in player_map.items()
+        ),
+        key=lambda item: item["score"],
+        reverse=True,
+    )
+
+    return {
+        "record_count": len(records),
+        "warning_count": risk_counts["预警"],
+        "average_score": round(sum(record["fitness_score"] for record in records) / len(records), 1) if records else 0,
+        "avg_speed": round(sum(record["speed"] for record in records) / len(records), 1) if records else 0,
+        "risk_pie": [{"name": key, "value": value} for key, value in risk_counts.items()],
+        "month_labels": month_labels,
+        "monthly_scores": monthly_scores,
+        "monthly_speed": monthly_speed,
+        "monthly_hours": monthly_hours,
+        "player_names": [item["name"] for item in player_scores],
+        "player_scores": [item["score"] for item in player_scores],
+    }
+
+
+def get_editing_fitness_record(edit_id):
+    if not edit_id.isdigit():
+        return None
+    record = next((item for item in FITNESS_TESTS if item["id"] == int(edit_id)), None)
+    return enrich_fitness_record(record) if record else None
+
+
+def save_fitness_test(form, operator):
+    validated = validate_fitness_form(form)
+    original_tests = deepcopy(FITNESS_TESTS)
+    original_logs = deepcopy(TRAINING_SYNC_LOGS)
+    try:
+        record_id = validated.pop("record_id")
+        if record_id:
+            target = next((item for item in FITNESS_TESTS if item["id"] == record_id), None)
+            if not target:
+                raise ValidationError("要修改的体能测试记录不存在。")
+            target.update(validated)
+            target["created_by"] = operator
+            sync_log = next((item for item in TRAINING_SYNC_LOGS if item["fitness_test_id"] == record_id), None)
+            if sync_log:
+                sync_log.update(
+                    {
+                        "athlete_id": validated["athlete_id"],
+                        "coach_id": validated["tester_id"],
+                        "sync_date": validated["test_date"],
+                        "plan_name": validated["plan_name"],
+                        "hours": validated["hours"],
+                        "intensity": validated["intensity"],
+                        "status": validated["plan_status"],
+                    }
+                )
+        else:
+            new_id = next_id(FITNESS_TESTS)
+            FITNESS_TESTS.append(
+                {
+                    "id": new_id,
+                    **validated,
+                    "created_by": operator,
+                }
+            )
+            TRAINING_SYNC_LOGS.append(
+                {
+                    "id": next_id(TRAINING_SYNC_LOGS),
+                    "fitness_test_id": new_id,
+                    "athlete_id": validated["athlete_id"],
+                    "coach_id": validated["tester_id"],
+                    "sync_date": validated["test_date"],
+                    "plan_name": validated["plan_name"],
+                    "hours": validated["hours"],
+                    "intensity": validated["intensity"],
+                    "status": validated["plan_status"],
+                }
+            )
+    except Exception:
+        FITNESS_TESTS[:] = original_tests
+        TRAINING_SYNC_LOGS[:] = original_logs
+        raise
+
+
+def validate_fitness_form(form):
+    record_id = form.get("record_id", "").strip()
+    athlete_id = parse_int_field(form.get("athlete_id", "").strip(), "运动员")
+    if not any(player["id"] == athlete_id for player in PLAYERS):
+        raise ValidationError("所选运动员不存在，请重新选择。")
+    tester_id = parse_int_field(form.get("tester_id", "").strip(), "测试教练")
+    if not any(coach["id"] == tester_id for coach in COACHES):
+        raise ValidationError("所选测试教练不存在，请重新选择。")
+
+    test_date = form.get("test_date", "").strip()
+    try:
+        datetime.strptime(test_date, "%Y-%m-%d")
+    except ValueError as exc:
+        raise ValidationError("测试日期格式错误，请使用 YYYY-MM-DD。") from exc
+
+    upper_strength = parse_float_range(form.get("upper_strength", "").strip(), "上肢力量", 0, 100)
+    lower_strength = parse_float_range(form.get("lower_strength", "").strip(), "下肢力量", 0, 100)
+    flexibility = parse_float_range(form.get("flexibility", "").strip(), "柔韧性", 0, 100)
+    endurance = parse_float_range(form.get("endurance", "").strip(), "耐力", 0, 100)
+    speed = parse_float_range(form.get("speed", "").strip(), "速度", 0, 100)
+    hours = parse_float_range(form.get("hours", "").strip(), "训练时长", 0, 999.9)
+
+    intensity = form.get("intensity", "").strip()
+    if intensity not in INTENSITY_LABELS:
+        raise ValidationError("训练强度非法，请从低、中、高、极高中选择。")
+    plan_status = form.get("plan_status", "").strip()
+    if plan_status not in {"进行中", "已完成", "已取消"}:
+        raise ValidationError("训练计划状态非法。")
+    plan_name = form.get("plan_name", "").strip()
+    if not plan_name:
+        raise ValidationError("训练计划名称不能为空。")
+
+    notes = form.get("notes", "").strip()
+    if len(notes) > 120:
+        raise ValidationError("备注不能超过 120 个字符。")
+
+    overall_score = round((upper_strength + lower_strength + flexibility + endurance + speed) / 5, 2)
+
+    return {
+        "record_id": int(record_id) if record_id.isdigit() else None,
+        "athlete_id": athlete_id,
+        "test_date": test_date,
+        "tester_id": tester_id,
+        "upper_strength": upper_strength,
+        "lower_strength": lower_strength,
+        "flexibility": flexibility,
+        "endurance": endurance,
+        "speed": speed,
+        "overall_score": overall_score,
+        "plan_name": plan_name,
+        "hours": hours,
+        "intensity": intensity,
+        "plan_status": plan_status,
+        "notes": notes,
+    }
+
+
+def build_redirect_query(form):
+    edit_id = form.get("record_id", "").strip()
+    if edit_id:
+        return {"edit_id": edit_id}
+    return {}
+
+
+def next_id(rows):
+    return max((item["id"] for item in rows), default=0) + 1
+
+
+def parse_int_field(value, field_name):
+    if not value:
+        raise ValidationError(f"{field_name}不能为空。")
+    try:
+        return int(value)
+    except ValueError as exc:
+        raise ValidationError(f"{field_name}必须为整数。") from exc
+
+
+def parse_int_range(value, field_name, min_value, max_value):
+    parsed = parse_int_field(value, field_name)
+    if parsed < min_value or parsed > max_value:
+        raise ValidationError(f"{field_name}必须介于 {min_value} 和 {max_value} 之间。")
+    return parsed
+
+
+def parse_float_range(value, field_name, min_value, max_value):
+    if not value:
+        raise ValidationError(f"{field_name}不能为空。")
+    try:
+        parsed = float(value)
+    except ValueError as exc:
+        raise ValidationError(f"{field_name}必须为数字类型。") from exc
+    if parsed < min_value or parsed > max_value:
+        raise ValidationError(f"{field_name}必须介于 {min_value} 和 {max_value} 之间。")
+    return round(parsed, 3)
+
+
+def parse_date_field(value, field_name):
+    if not value:
+        raise ValidationError(f"{field_name}不能为空。")
+    try:
+        datetime.strptime(value, "%Y-%m-%d")
+    except ValueError as exc:
+        raise ValidationError(f"{field_name}格式错误，请使用 YYYY-MM-DD。") from exc
+    return value
+
+
+def parse_optional_query_date(value, field_name, errors):
+    if not value:
+        return ""
+    try:
+        datetime.strptime(value, "%Y-%m-%d")
+    except ValueError:
+        errors.append(f"{field_name}格式错误，已忽略该条件。")
+        return ""
+    return value
+
+
+def is_float_value(value):
+    if not value:
+        return False
+    try:
+        float(value)
+        return True
+    except ValueError:
+        return False
 
 
 def current_user():
