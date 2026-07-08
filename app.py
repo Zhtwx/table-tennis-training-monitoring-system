@@ -465,7 +465,9 @@ def create_app():
                 flash(f"伤病登记失败，已回滚本次变更：{exc}", "danger")
             return redirect(url_for("injuries.list", **build_injury_redirect_query(request.form)))
 
-        injury_records, active_condition_count = filter_injury_records(request.args)
+        injury_records, active_condition_count, query_errors = filter_injury_records(request.args)
+        for error in query_errors:
+            flash(error, "warning")
         editing_record = get_editing_injury_record(request.args.get("edit_id", "").strip())
         summary = build_injury_summary(injury_records)
         return render_template(
@@ -625,12 +627,13 @@ class ValidationError(Exception):
 
 def filter_injury_records(args):
     predicates = []
+    query_errors = []
     player_keyword = args.get("player_keyword", "").strip().lower()
     location_keyword = args.get("location_keyword", "").strip().lower()
     severity = args.get("severity", "").strip()
     recovery_status = args.get("recovery_status", "").strip()
-    date_from = args.get("date_from", "").strip()
-    date_to = args.get("date_to", "").strip()
+    date_from = parse_optional_query_date(args.get("date_from", "").strip(), "开始日期", query_errors)
+    date_to = parse_optional_query_date(args.get("date_to", "").strip(), "结束日期", query_errors)
     active_only = args.get("active_only", "").strip()
 
     if player_keyword:
@@ -644,9 +647,19 @@ def filter_injury_records(args):
             or value in record["injury_type"].lower()
         )
     if severity:
-        predicates.append(lambda record, value=severity: record["severity"] == value)
+        if severity in INJURY_SEVERITY_OPTIONS:
+            predicates.append(lambda record, value=severity: record["severity"] == value)
+        else:
+            query_errors.append("伤病程度筛选条件非法，已忽略该条件。")
     if recovery_status:
-        predicates.append(lambda record, value=recovery_status: record["recovery_status"] == value)
+        if recovery_status in INJURY_RECOVERY_STATUS_OPTIONS:
+            predicates.append(lambda record, value=recovery_status: record["recovery_status"] == value)
+        else:
+            query_errors.append("恢复状态筛选条件非法，已忽略该条件。")
+    if date_from and date_to and date_from > date_to:
+        query_errors.append("开始日期不能晚于结束日期，已忽略日期范围条件。")
+        date_from = ""
+        date_to = ""
     if date_from:
         predicates.append(lambda record, value=date_from: record["injury_date"] >= value)
     if date_to:
@@ -657,8 +670,8 @@ def filter_injury_records(args):
     records = [enrich_injury_record(item) for item in INJURY_RECORDS]
     records.sort(key=lambda item: (item["injury_date"], item["id"]), reverse=True)
     if not predicates:
-        return records, 0
-    return [record for record in records if all(check(record) for check in predicates)], len(predicates)
+        return records, 0, query_errors
+    return [record for record in records if all(check(record) for check in predicates)], len(predicates), query_errors
 
 
 def enrich_injury_record(record):
@@ -771,6 +784,8 @@ def save_injury_record(form, operator):
 
 def validate_injury_form(form):
     record_id = form.get("record_id", "").strip()
+    if record_id and not record_id.isdigit():
+        raise ValidationError("伤病记录编号非法，请从列表中选择要修改的记录。")
     athlete_id = parse_int_field(form.get("athlete_id", "").strip(), "运动员")
     if not any(player["id"] == athlete_id for player in PLAYERS):
         raise ValidationError("所选运动员不存在，请重新选择。")
@@ -812,6 +827,9 @@ def validate_injury_form(form):
     ):
         if len(value) > max_length:
             raise ValidationError(f"{field_label}不能超过 {max_length} 个字符。")
+
+    if recovery_status == "已恢复" and not expected_recovery_date:
+        expected_recovery_date = injury_date
 
     return {
         "record_id": int(record_id) if record_id.isdigit() else None,
@@ -1204,6 +1222,17 @@ def parse_date_field(value, field_name):
         datetime.strptime(value, "%Y-%m-%d")
     except ValueError as exc:
         raise ValidationError(f"{field_name}格式错误，请使用 YYYY-MM-DD。") from exc
+    return value
+
+
+def parse_optional_query_date(value, field_name, errors):
+    if not value:
+        return ""
+    try:
+        datetime.strptime(value, "%Y-%m-%d")
+    except ValueError:
+        errors.append(f"{field_name}格式错误，已忽略该条件。")
+        return ""
     return value
 
 
