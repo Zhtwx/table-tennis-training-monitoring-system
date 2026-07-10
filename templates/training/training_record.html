@@ -1,0 +1,178 @@
+{% extends "base.html" %}
+
+{% block title %}专项技术记录查询 - 乒乓球运动员综合训练监控管理系统{% endblock %}
+
+{% block content %}
+<div class="d-flex flex-column flex-md-row align-items-md-center justify-content-between gap-3 mb-4">
+    <div>
+        <h1 class="page-title h3 mb-1">专项技术记录查询</h1>
+        <p class="text-secondary mb-0">按运动员、日期、步法、击球技术、训练强度和多球时长组合筛选专项训练记录。</p>
+    </div>
+    <div class="d-flex gap-2">
+        <a href="{{ url_for('training.export_records', **request.args) }}" class="btn btn-outline-success">导出记录</a>
+        <a href="{{ url_for('training.batch_import') }}" class="btn btn-primary">新增记录</a>
+    </div>
+</div>
+
+<div class="row g-3 mb-4">
+    <div class="col-12 col-md-3">
+        <div class="card shadow-sm stat-card h-100">
+            <div class="card-body">
+                <div class="text-secondary small">命中记录</div>
+                <div class="fs-3 fw-bold">{{ summary.record_count }}</div>
+            </div>
+        </div>
+    </div>
+    <div class="col-12 col-md-3">
+        <div class="card shadow-sm stat-card h-100">
+            <div class="card-body">
+                <div class="text-secondary small">多球总时长</div>
+                <div class="fs-3 fw-bold">{{ summary.total_minutes }}</div>
+            </div>
+        </div>
+    </div>
+    <div class="col-12 col-md-3">
+        <div class="card shadow-sm stat-card h-100">
+            <div class="card-body">
+                <div class="text-secondary small">平均时长</div>
+                <div class="fs-3 fw-bold">{{ summary.average_minutes }}</div>
+            </div>
+        </div>
+    </div>
+    <div class="col-12 col-md-3">
+        <div class="card shadow-sm stat-card h-100">
+            <div class="card-body">
+                <div class="text-secondary small">高强度记录</div>
+                <div class="fs-3 fw-bold">{{ summary.high_intensity_count }}</div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<div class="card shadow-sm mb-4">
+    <div class="card-header bg-white border-0 pt-4 px-4">
+        <h2 class="h5 mb-1">筛选条件</h2>
+        <p class="text-secondary small mb-0">当前命中 {{ records|length }} 条记录，共 {{ total_count }} 条，启用 {{ active_condition_count }} 个查询条件。</p>
+    </div>
+    <div class="card-body">
+        <form method="get" action="{{ url_for('training.record') }}" class="row g-3 align-items-end">
+            <div class="col-12 col-md-3">
+                <label for="athlete_id" class="form-label">运动员</label>
+                <select class="form-select" id="athlete_id" name="athlete_id">
+                    <option value="">全部运动员</option>
+                    {% for athlete in athletes %}
+                        <option value="{{ athlete.id }}" {% if request.args.get('athlete_id') == athlete.id|string %}selected{% endif %}>
+                            {{ athlete.name }}
+                        </option>
+                    {% endfor %}
+                </select>
+            </div>
+            <div class="col-12 col-md-3">
+                <label for="start_date" class="form-label">开始日期</label>
+                <input type="date" class="form-control" id="start_date" name="start_date" value="{{ request.args.get('start_date', '') }}">
+            </div>
+            <div class="col-12 col-md-3">
+                <label for="end_date" class="form-label">结束日期</label>
+                <input type="date" class="form-control" id="end_date" name="end_date" value="{{ request.args.get('end_date', '') }}">
+            </div>
+            <div class="col-12 col-md-3">
+                <label for="footwork_type" class="form-label">步法训练</label>
+                <select class="form-select" id="footwork_type" name="footwork_type">
+                    <option value="">全部步法</option>
+                    {% for code, label in footwork_type_labels.items() %}
+                        <option value="{{ code }}" {% if request.args.get('footwork_type') == code %}selected{% endif %}>{{ label }}</option>
+                    {% endfor %}
+                </select>
+            </div>
+            <div class="col-12 col-md-3">
+                <label for="stroke_technique" class="form-label">击球技术</label>
+                <select class="form-select" id="stroke_technique" name="stroke_technique">
+                    <option value="">全部技术</option>
+                    {% for code, label in stroke_technique_labels.items() %}
+                        <option value="{{ code }}" {% if request.args.get('stroke_technique') == code %}selected{% endif %}>{{ label }}</option>
+                    {% endfor %}
+                </select>
+            </div>
+            <div class="col-12 col-md-3">
+                <label for="intensity" class="form-label">训练强度</label>
+                <select class="form-select" id="intensity" name="intensity">
+                    <option value="">全部强度</option>
+                    {% for code, label in technical_intensity_labels.items() %}
+                        <option value="{{ code }}" {% if request.args.get('intensity') == code %}selected{% endif %}>{{ label }}</option>
+                    {% endfor %}
+                </select>
+            </div>
+            <div class="col-6 col-md-2">
+                <label for="minutes_min" class="form-label">最短时长</label>
+                <input type="number" class="form-control" id="minutes_min" name="minutes_min" min="0"
+                       value="{{ request.args.get('minutes_min', '') }}">
+            </div>
+            <div class="col-6 col-md-2">
+                <label for="minutes_max" class="form-label">最长时长</label>
+                <input type="number" class="form-control" id="minutes_max" name="minutes_max" min="0"
+                       value="{{ request.args.get('minutes_max', '') }}">
+            </div>
+            <div class="col-12 col-md-4">
+                <label for="keyword" class="form-label">关键词</label>
+                <input type="text" class="form-control" id="keyword" name="keyword"
+                       value="{{ request.args.get('keyword', '') }}" placeholder="运动员、备注、技术关键词">
+            </div>
+            <div class="col-12 d-flex gap-2">
+                <button type="submit" class="btn btn-primary">查询</button>
+                <a href="{{ url_for('training.record') }}" class="btn btn-outline-secondary">重置</a>
+            </div>
+        </form>
+    </div>
+</div>
+
+<div class="card shadow-sm">
+    <div class="card-header bg-white d-flex justify-content-between align-items-center py-3">
+        <h2 class="h5 mb-0">记录列表</h2>
+        <span class="badge text-bg-secondary">{{ records|length }} 条记录</span>
+    </div>
+    <div class="card-body p-0">
+        <div class="table-responsive">
+            <table class="table table-hover align-middle mb-0">
+                <thead class="table-light">
+                    <tr>
+                        <th>运动员</th>
+                        <th>训练日期</th>
+                        <th>步法训练</th>
+                        <th>击球技术</th>
+                        <th>多球时长</th>
+                        <th>训练强度</th>
+                        <th>备注</th>
+                        <th class="text-end">操作</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for record in records %}
+                    <tr>
+                        <td>
+                            <div class="fw-semibold">{{ record.athlete_name }}</div>
+                            <div class="text-secondary small">{{ record.student_no }} · {{ record.level }}</div>
+                        </td>
+                        <td>{{ record.training_date }}</td>
+                        <td>{{ record.footwork_label }}</td>
+                        <td>{{ record.stroke_label }}</td>
+                        <td>{{ record.multi_ball_minutes }} 分钟</td>
+                        <td><span class="badge text-bg-secondary">{{ record.intensity_label }}</span></td>
+                        <td class="small">{{ record.note or '-' }}</td>
+                        <td class="text-end text-nowrap">
+                            <a href="{{ url_for('training.batch_import', edit_id=record.id) }}" class="btn btn-sm btn-outline-primary">编辑</a>
+                            <form method="post" action="{{ url_for('training.delete_record', record_id=record.id) }}" class="d-inline" onsubmit="return confirm('确认删除该专项技术记录？');">
+                                <button type="submit" class="btn btn-sm btn-outline-danger">删除</button>
+                            </form>
+                        </td>
+                    </tr>
+                    {% else %}
+                    <tr>
+                        <td colspan="8" class="text-center text-secondary py-5">暂无专项技术记录。</td>
+                    </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+    </div>
+</div>
+{% endblock %}

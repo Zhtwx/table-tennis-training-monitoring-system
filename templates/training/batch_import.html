@@ -6,42 +6,47 @@
 <div class="d-flex flex-column flex-md-row align-items-md-center justify-content-between gap-3 mb-4">
     <div>
         <h1 class="page-title h3 mb-1">专项技术录入</h1>
-        <p class="text-secondary mb-0">记录步法、击球、多球训练等专项数据，形成可追踪的技术成长档案。</p>
+        <p class="text-secondary mb-0">记录步法训练、击球技术、多球训练时长和训练强度，形成可查询的专项技术档案。</p>
     </div>
-    <span class="badge text-bg-success align-self-start align-self-md-center">在线录入</span>
+    <a href="{{ url_for('training.record') }}" class="btn btn-outline-primary">查看记录</a>
 </div>
 
 <div class="row g-4">
     <div class="col-12 col-xl-7">
         <div class="card shadow-sm h-100">
             <div class="card-header bg-white border-0 pt-4 px-4">
-                <h2 class="h5 mb-1">日常训练记录</h2>
+                <h2 class="h5 mb-1">{% if editing_record %}修改专项技术记录{% else %}新增专项技术记录{% endif %}</h2>
                 <p class="text-secondary small mb-0">录入单次专项训练的核心指标。</p>
             </div>
             <div class="card-body">
-                <form method="post" action="{{ url_for('training.batch_import') }}" class="row g-3">
+                <form method="post"
+                      action="{% if editing_record %}{{ url_for('training.edit_record', record_id=editing_record.id) }}{% else %}{{ url_for('training.batch_import') }}{% endif %}"
+                      class="row g-3">
                     <div class="col-12 col-md-6">
-                        <label for="player_id" class="form-label">运动员</label>
-                        <select class="form-select" id="player_id" name="player_id" required>
+                        <label for="athlete_id" class="form-label">运动员</label>
+                        <select class="form-select" id="athlete_id" name="athlete_id" required>
                             <option value="">请选择运动员</option>
-                            <option value="1">王一鸣</option>
-                            <option value="2">李清扬</option>
+                            {% for athlete in athletes %}
+                                <option value="{{ athlete.id }}" {% if editing_record and editing_record.athlete_id == athlete.id %}selected{% endif %}>
+                                    {{ athlete.name }}（{{ athlete.student_no }}）
+                                </option>
+                            {% endfor %}
                         </select>
                     </div>
 
                     <div class="col-12 col-md-6">
                         <label for="training_date" class="form-label">训练日期</label>
-                        <input type="date" class="form-control" id="training_date" name="training_date" required>
+                        <input type="date" class="form-control" id="training_date" name="training_date"
+                               value="{{ editing_record.training_date if editing_record else '' }}" required>
                     </div>
 
                     <div class="col-12 col-md-6">
                         <label for="footwork_type" class="form-label">步法训练</label>
                         <select class="form-select" id="footwork_type" name="footwork_type" required>
                             <option value="">请选择步法类型</option>
-                            <option value="single_step">单步</option>
-                            <option value="parallel_step">并步</option>
-                            <option value="cross_step">交叉步</option>
-                            <option value="composite">综合步法</option>
+                            {% for code, label in footwork_type_labels.items() %}
+                                <option value="{{ code }}" {% if editing_record and editing_record.footwork_type == code %}selected{% endif %}>{{ label }}</option>
+                            {% endfor %}
                         </select>
                     </div>
 
@@ -49,40 +54,42 @@
                         <label for="stroke_technique" class="form-label">击球技术</label>
                         <select class="form-select" id="stroke_technique" name="stroke_technique" required>
                             <option value="">请选择击球技术</option>
-                            <option value="forehand_loop">正手弧圈</option>
-                            <option value="backhand_drive">反手快拨</option>
-                            <option value="serve_receive">发接发</option>
-                            <option value="smash">扣杀</option>
-                            <option value="defense">防守转换</option>
+                            {% for code, label in stroke_technique_labels.items() %}
+                                <option value="{{ code }}" {% if editing_record and editing_record.stroke_technique == code %}selected{% endif %}>{{ label }}</option>
+                            {% endfor %}
                         </select>
                     </div>
 
                     <div class="col-12 col-md-6">
                         <label for="multi_ball_minutes" class="form-label">多球训练时长（分钟）</label>
                         <input type="number" class="form-control" id="multi_ball_minutes" name="multi_ball_minutes"
-                               min="0" max="300" step="5" placeholder="例如：60" required>
+                               min="0" max="300" step="1"
+                               value="{{ editing_record.multi_ball_minutes if editing_record else '' }}" required>
                     </div>
 
                     <div class="col-12 col-md-6">
                         <label for="intensity" class="form-label">训练强度</label>
                         <select class="form-select" id="intensity" name="intensity" required>
                             <option value="">请选择强度</option>
-                            <option value="low">低强度</option>
-                            <option value="medium">中强度</option>
-                            <option value="high">高强度</option>
-                            <option value="extreme">极高强度</option>
+                            {% for code, label in technical_intensity_labels.items() %}
+                                <option value="{{ code }}" {% if editing_record and editing_record.intensity == code %}selected{% endif %}>{{ label }}</option>
+                            {% endfor %}
                         </select>
                     </div>
 
                     <div class="col-12">
                         <label for="training_note" class="form-label">训练备注</label>
-                        <textarea class="form-control" id="training_note" name="training_note" rows="4"
-                                  placeholder="记录技术问题、教练建议、身体反馈等"></textarea>
+                        <textarea class="form-control" id="training_note" name="training_note" rows="4" maxlength="200"
+                                  placeholder="记录技术问题、教练建议、身体反馈等">{{ editing_record.note if editing_record else '' }}</textarea>
                     </div>
 
                     <div class="col-12 d-flex justify-content-end gap-2">
-                        <button type="reset" class="btn btn-outline-secondary">重置</button>
-                        <button type="submit" class="btn btn-primary">保存训练记录</button>
+                        {% if editing_record %}
+                            <a href="{{ url_for('training.batch_import') }}" class="btn btn-outline-secondary">取消修改</a>
+                        {% else %}
+                            <button type="reset" class="btn btn-outline-secondary">重置</button>
+                        {% endif %}
+                        <button type="submit" class="btn btn-primary">{% if editing_record %}保存修改{% else %}保存记录{% endif %}</button>
                     </div>
                 </form>
             </div>
@@ -92,11 +99,11 @@
     <div class="col-12 col-xl-5">
         <div class="card shadow-sm mb-4">
             <div class="card-header bg-white border-0 pt-4 px-4">
-                <h2 class="h5 mb-1">月度数据导入</h2>
-                <p class="text-secondary small mb-0">上传 Excel 文件，批量导入历史训练数据。</p>
+                <h2 class="h5 mb-1">Excel 批量导入</h2>
+                <p class="text-secondary small mb-0">上传月度专项技术记录，系统会逐行校验后导入。</p>
             </div>
             <div class="card-body">
-                <form method="post" action="{{ url_for('training.import_excel') }}" enctype="multipart/form-data">
+                <form method="post" action="{{ url_for('training.import_skill_excel') }}" enctype="multipart/form-data">
                     <div class="mb-3">
                         <label for="training_excel" class="form-label">选择 Excel 文件</label>
                         <input class="form-control" type="file" id="training_excel" name="training_excel"
@@ -104,7 +111,7 @@
                     </div>
 
                     <div class="alert alert-info mb-3" role="alert">
-                        支持字段：运动员编号、训练日期、步法类型、击球技术、多球时长、训练强度、备注。
+                        表头顺序：运动员编号或姓名、训练日期、步法类型、击球技术、多球时长、训练强度、备注。
                     </div>
 
                     <div class="d-grid">
@@ -115,34 +122,9 @@
         </div>
 
         <div class="alert alert-warning shadow-sm" role="alert">
-            <div class="fw-semibold mb-1">数据校验提示</div>
+            <div class="fw-semibold mb-1">数据校验规则</div>
             <div class="small">
-                系统将检查空值、日期格式、运动员编号、训练强度范围等异常，确保数据入库前可靠。
-            </div>
-        </div>
-
-        <button type="button" class="btn btn-outline-warning w-100" data-bs-toggle="modal" data-bs-target="#importErrorModal">
-            查看异常明细
-        </button>
-    </div>
-</div>
-
-<div class="modal fade" id="importErrorModal" tabindex="-1" aria-labelledby="importErrorModalLabel" aria-hidden="true">
-    <div class="modal-dialog modal-lg modal-dialog-scrollable">
-        <div class="modal-content">
-            <div class="modal-header">
-                <h2 class="modal-title fs-5" id="importErrorModalLabel">Excel 数据校验结果</h2>
-                <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="关闭"></button>
-            </div>
-            <div class="modal-body">
-                <ul class="list-group">
-                    <li class="list-group-item">第 3 行：运动员编号为空，请补充后重新上传。</li>
-                    <li class="list-group-item">第 8 行：训练强度不在允许范围内。</li>
-                    <li class="list-group-item">第 12 行：训练日期格式错误，建议使用 2026-07-06。</li>
-                </ul>
-            </div>
-            <div class="modal-footer">
-                <button type="button" class="btn btn-primary" data-bs-dismiss="modal">我知道了</button>
+                训练日期必须是 YYYY-MM-DD；多球时长范围为 0 到 300 分钟；步法、击球技术和强度必须匹配系统选项。
             </div>
         </div>
     </div>

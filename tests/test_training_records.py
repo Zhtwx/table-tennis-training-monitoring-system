@@ -1,0 +1,105 @@
+from copy import deepcopy
+
+import app as app_module
+from app import PLAYERS, app
+
+
+def login(client, username="admin", password="admin123"):
+    return client.post(
+        "/login",
+        data={"username": username, "password": password},
+        follow_redirects=True,
+    )
+
+
+def get_training_records():
+    return getattr(app_module, "TECHNICAL_TRAINING_RECORDS", [])
+
+
+def test_specialized_training_records_support_crud_and_complex_filters():
+    original_records = deepcopy(get_training_records())
+    try:
+        client = app.test_client()
+        login(client)
+
+        create_response = client.post(
+            "/training/batch-import",
+            data={
+                "athlete_id": "3",
+                "training_date": "2026-07-08",
+                "footwork_type": "cross_step",
+                "stroke_technique": "smash",
+                "multi_ball_minutes": "35",
+                "intensity": "high",
+                "training_note": "precision footwork note",
+            },
+            follow_redirects=True,
+        )
+
+        records = get_training_records()
+        assert create_response.status_code == 200
+        assert len(records) == len(original_records) + 1
+        record_id = records[-1]["id"]
+        assert records[-1]["athlete_id"] == 3
+
+        filtered_response = client.get(
+            "/training/records"
+            "?athlete_id=3"
+            "&start_date=2026-07-01"
+            "&end_date=2026-07-31"
+            "&footwork_type=cross_step"
+            "&stroke_technique=smash"
+            "&intensity=high"
+            "&minutes_min=30"
+            "&minutes_max=40"
+            "&keyword=precision"
+        )
+        filtered_body = filtered_response.get_data(as_text=True)
+
+        assert filtered_response.status_code == 200
+        assert "precision footwork note" in filtered_body
+        assert "2026-07-08" in filtered_body
+
+        edit_page = client.get(f"/training/batch-import?edit_id={record_id}")
+        assert edit_page.status_code == 200
+        assert "precision footwork note" in edit_page.get_data(as_text=True)
+
+        edit_response = client.post(
+            f"/training/records/{record_id}/edit",
+            data={
+                "athlete_id": "3",
+                "training_date": "2026-07-09",
+                "footwork_type": "composite",
+                "stroke_technique": "serve_receive",
+                "multi_ball_minutes": "45",
+                "intensity": "medium",
+                "training_note": "updated record note",
+            },
+            follow_redirects=True,
+        )
+
+        assert edit_response.status_code == 200
+        assert records[-1]["training_date"] == "2026-07-09"
+        assert records[-1]["multi_ball_minutes"] == 45
+
+        delete_response = client.post(
+            f"/training/records/{record_id}/delete",
+            follow_redirects=True,
+        )
+
+        assert delete_response.status_code == 200
+        assert all(record["id"] != record_id for record in get_training_records())
+    finally:
+        records = get_training_records()
+        records[:] = original_records
+
+
+def test_training_record_form_uses_current_player_list():
+    client = app.test_client()
+    login(client)
+
+    response = client.get("/training/batch-import")
+    body = response.get_data(as_text=True)
+
+    assert response.status_code == 200
+    assert PLAYERS[-1]["name"] in body

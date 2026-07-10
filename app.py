@@ -41,6 +41,7 @@ NAV_ITEMS = [
     {"label": "教练员信息", "endpoint": "coaches.list", "roles": {"admin", "coach"}},
     {"label": "训练计划", "endpoint": "training.plans", "roles": {"admin", "coach"}},
     {"label": "专项技术录入", "endpoint": "training.batch_import", "roles": {"admin", "coach"}},
+    {"label": "专项技术查询", "endpoint": "training.record", "roles": {"admin", "coach"}},
     {"label": "体能测试", "endpoint": "fitness.tests", "roles": {"admin", "coach"}},
     {"label": "伤病记录", "endpoint": "injuries.list", "roles": {"admin", "coach"}},
     {"label": "康复跟踪", "endpoint": "rehab.list", "roles": {"admin", "coach"}},
@@ -137,6 +138,30 @@ TRAINING_PLANS = [
     },
 ]
 PLAN_ID_COUNTER = 3
+
+TECHNICAL_TRAINING_RECORDS = []
+
+FOOTWORK_TYPE_LABELS = {
+    "single_step": "单步",
+    "parallel_step": "并步",
+    "cross_step": "交叉步",
+    "composite": "综合步法",
+}
+
+STROKE_TECHNIQUE_LABELS = {
+    "forehand_loop": "正手弧圈",
+    "backhand_drive": "反手快拨",
+    "serve_receive": "发接发",
+    "smash": "扣杀",
+    "defense": "防守转换",
+}
+
+TECHNICAL_INTENSITY_LABELS = {
+    "low": "低强度",
+    "medium": "中强度",
+    "high": "高强度",
+    "extreme": "极高强度",
+}
 
 
 
@@ -745,10 +770,139 @@ def create_app():
     @training_bp.route("/batch-import", methods=["GET", "POST"], endpoint="batch_import")
     @role_required("admin", "coach")
     def training_batch_import():
+        editing_record = get_editing_technical_record(request.args.get("edit_id", "").strip())
         if request.method == "POST":
-            flash("训练记录已提交。", "success")
+            try:
+                if editing_record:
+                    save_technical_training_record(request.form, current_user()["username"], editing_record["id"])
+                    flash("专项技术记录已更新。", "success")
+                else:
+                    save_technical_training_record(request.form, current_user()["username"])
+                    flash("专项技术记录已保存。", "success")
+                return redirect(url_for("training.record"))
+            except ValidationError as exc:
+                flash(str(exc), "danger")
+
+        return render_template(
+            "training/batch_import.html",
+            athletes=PLAYERS,
+            editing_record=editing_record,
+            footwork_type_labels=FOOTWORK_TYPE_LABELS,
+            stroke_technique_labels=STROKE_TECHNIQUE_LABELS,
+            technical_intensity_labels=TECHNICAL_INTENSITY_LABELS,
+        )
+
+    @training_bp.route("/records", endpoint="record")
+    @training_bp.route("/training_record", endpoint="training_record")
+    @role_required("admin", "coach")
+    def training_records():
+        records, active_condition_count = filter_technical_training_records(request.args)
+        return render_template(
+            "training/training_record.html",
+            records=records,
+            athletes=PLAYERS,
+            total_count=len(TECHNICAL_TRAINING_RECORDS),
+            active_condition_count=active_condition_count,
+            footwork_type_labels=FOOTWORK_TYPE_LABELS,
+            stroke_technique_labels=STROKE_TECHNIQUE_LABELS,
+            technical_intensity_labels=TECHNICAL_INTENSITY_LABELS,
+            summary=build_technical_training_summary(records),
+        )
+
+    @training_bp.route("/records/<int:record_id>/edit", methods=["POST"], endpoint="edit_record")
+    @role_required("admin", "coach")
+    def edit_training_record(record_id):
+        try:
+            save_technical_training_record(request.form, current_user()["username"], record_id)
+            flash("专项技术记录已更新。", "success")
+        except ValidationError as exc:
+            flash(str(exc), "danger")
+            return redirect(url_for("training.batch_import", edit_id=record_id))
+        return redirect(url_for("training.record"))
+
+    @training_bp.route("/records/<int:record_id>/delete", methods=["POST"], endpoint="delete_record")
+    @role_required("admin", "coach")
+    def delete_training_record(record_id):
+        record = next((item for item in TECHNICAL_TRAINING_RECORDS if item["id"] == record_id), None)
+        if not record:
+            flash("专项技术记录不存在。", "danger")
+        else:
+            TECHNICAL_TRAINING_RECORDS.remove(record)
+            flash("专项技术记录已删除。", "success")
+        return redirect(url_for("training.record"))
+
+    @training_bp.route("/records/import-excel", methods=["POST"], endpoint="import_skill_excel")
+    @role_required("admin", "coach")
+    def import_skill_excel():
+        file = request.files.get("training_excel")
+        if not file:
+            flash("请先选择 Excel 文件。", "warning")
             return redirect(url_for("training.batch_import"))
-        return render_template("training/batch_import.html")
+
+        imported_count = 0
+        error_rows = []
+        try:
+            wb = openpyxl.load_workbook(file)
+            ws = wb.active
+            for idx, row in enumerate(ws.iter_rows(min_row=2, values_only=True), start=2):
+                athlete_value, training_date, footwork, stroke, minutes, intensity, note = (list(row) + [None] * 7)[:7]
+                if not any([athlete_value, training_date, footwork, stroke, minutes, intensity, note]):
+                    continue
+                form = {
+                    "athlete_id": resolve_athlete_id(athlete_value),
+                    "training_date": normalize_excel_date(training_date),
+                    "footwork_type": resolve_option_code(footwork, FOOTWORK_TYPE_LABELS),
+                    "stroke_technique": resolve_option_code(stroke, STROKE_TECHNIQUE_LABELS),
+                    "multi_ball_minutes": "" if minutes is None else str(minutes),
+                    "intensity": resolve_option_code(intensity, TECHNICAL_INTENSITY_LABELS),
+                    "training_note": "" if note is None else str(note),
+                }
+                try:
+                    save_technical_training_record(form, current_user()["username"])
+                    imported_count += 1
+                except ValidationError as exc:
+                    error_rows.append(f"第 {idx} 行：{exc}")
+
+            if error_rows:
+                flash(f"成功导入 {imported_count} 条，跳过 {len(error_rows)} 条异常数据。", "warning")
+                for err in error_rows[:5]:
+                    flash(err, "warning")
+            else:
+                flash(f"成功导入 {imported_count} 条专项技术记录。", "success")
+        except Exception as exc:
+            flash(f"Excel 解析失败：{exc}", "danger")
+
+        return redirect(url_for("training.batch_import"))
+
+    @training_bp.route("/records/export", methods=["GET"], endpoint="export_records")
+    @role_required("admin", "coach")
+    def export_training_records():
+        records, _ = filter_technical_training_records(request.args)
+        wb = openpyxl.Workbook()
+        ws = wb.active
+        ws.title = "专项技术记录"
+        headers = ["运动员", "训练日期", "步法训练", "击球技术", "多球时长", "训练强度", "备注"]
+        for col, header in enumerate(headers, 1):
+            cell = ws.cell(row=1, column=col, value=header)
+            cell.font = Font(bold=True)
+            cell.alignment = Alignment(horizontal="center")
+        for row_idx, record in enumerate(records, 2):
+            ws.cell(row=row_idx, column=1, value=record["athlete_name"])
+            ws.cell(row=row_idx, column=2, value=record["training_date"])
+            ws.cell(row=row_idx, column=3, value=record["footwork_label"])
+            ws.cell(row=row_idx, column=4, value=record["stroke_label"])
+            ws.cell(row=row_idx, column=5, value=record["multi_ball_minutes"])
+            ws.cell(row=row_idx, column=6, value=record["intensity_label"])
+            ws.cell(row=row_idx, column=7, value=record["note"])
+        buffer = io.BytesIO()
+        wb.save(buffer)
+        buffer.seek(0)
+        return send_file(
+            buffer,
+            as_attachment=True,
+            download_name="technical_training_records.xlsx",
+            mimetype="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+        )
 
     @training_bp.route("/import-excel", methods=["POST"], endpoint="import_excel")
     @role_required("admin", "coach")
@@ -1355,6 +1509,182 @@ def parse_date_for_calc(value):
 
 class ValidationError(Exception):
     pass
+
+
+def filter_technical_training_records(args):
+    predicates = []
+    athlete_id = args.get("athlete_id", "").strip()
+    start_date = args.get("start_date", "").strip()
+    end_date = args.get("end_date", "").strip()
+    footwork_type = args.get("footwork_type", "").strip()
+    stroke_technique = args.get("stroke_technique", "").strip()
+    intensity = args.get("intensity", "").strip()
+    minutes_min = args.get("minutes_min", "").strip()
+    minutes_max = args.get("minutes_max", "").strip()
+    keyword = args.get("keyword", "").strip().lower()
+
+    if athlete_id.isdigit():
+        predicates.append(lambda record, value=int(athlete_id): record["athlete_id"] == value)
+    if start_date:
+        predicates.append(lambda record, value=start_date: record["training_date"] >= value)
+    if end_date:
+        predicates.append(lambda record, value=end_date: record["training_date"] <= value)
+    if footwork_type in FOOTWORK_TYPE_LABELS:
+        predicates.append(lambda record, value=footwork_type: record["footwork_type"] == value)
+    if stroke_technique in STROKE_TECHNIQUE_LABELS:
+        predicates.append(lambda record, value=stroke_technique: record["stroke_technique"] == value)
+    if intensity in TECHNICAL_INTENSITY_LABELS:
+        predicates.append(lambda record, value=intensity: record["intensity"] == value)
+    if minutes_min.isdigit():
+        predicates.append(lambda record, value=int(minutes_min): record["multi_ball_minutes"] >= value)
+    if minutes_max.isdigit():
+        predicates.append(lambda record, value=int(minutes_max): record["multi_ball_minutes"] <= value)
+    if keyword:
+        predicates.append(
+            lambda record, value=keyword: value in record["athlete_name"].lower()
+            or value in record["note"].lower()
+            or value in record["footwork_label"].lower()
+            or value in record["stroke_label"].lower()
+        )
+
+    records = [enrich_technical_record(item) for item in TECHNICAL_TRAINING_RECORDS]
+    records.sort(key=lambda item: (item["training_date"], item["id"]), reverse=True)
+    if not predicates:
+        return records, 0
+    return [record for record in records if all(check(record) for check in predicates)], len(predicates)
+
+
+def enrich_technical_record(record):
+    player = find_player(record["athlete_id"])
+    base = dict(record)
+    base.update(
+        {
+            "athlete_name": player["name"] if player else record.get("athlete_name", "未知运动员"),
+            "student_no": player["student_no"] if player else "-",
+            "level": (player.get("skill_level") or player.get("level")) if player else "-",
+            "footwork_label": FOOTWORK_TYPE_LABELS.get(record["footwork_type"], record["footwork_type"]),
+            "stroke_label": STROKE_TECHNIQUE_LABELS.get(record["stroke_technique"], record["stroke_technique"]),
+            "intensity_label": TECHNICAL_INTENSITY_LABELS.get(record["intensity"], record["intensity"]),
+        }
+    )
+    return base
+
+
+def get_editing_technical_record(edit_id):
+    if not edit_id.isdigit():
+        return None
+    record = next((item for item in TECHNICAL_TRAINING_RECORDS if item["id"] == int(edit_id)), None)
+    return enrich_technical_record(record) if record else None
+
+
+def save_technical_training_record(form, operator, record_id=None):
+    validated = validate_technical_training_form(form)
+    if record_id is None:
+        TECHNICAL_TRAINING_RECORDS.append(
+            {
+                "id": next_id(TECHNICAL_TRAINING_RECORDS),
+                **validated,
+                "created_by": operator,
+            }
+        )
+        return
+
+    target = next((item for item in TECHNICAL_TRAINING_RECORDS if item["id"] == record_id), None)
+    if not target:
+        raise ValidationError("要修改的专项技术记录不存在。")
+    target.update(validated)
+    target["created_by"] = operator
+
+
+def validate_technical_training_form(form):
+    athlete_id = parse_int_field(str(form.get("athlete_id", "")).strip(), "运动员")
+    player = find_player(athlete_id)
+    if not player:
+        raise ValidationError("所选运动员不存在，请重新选择。")
+
+    training_date = parse_date_field(str(form.get("training_date", "")).strip(), "训练日期")
+
+    footwork_type = str(form.get("footwork_type", "")).strip()
+    if footwork_type not in FOOTWORK_TYPE_LABELS:
+        raise ValidationError("步法训练类型非法，请从页面选项中选择。")
+
+    stroke_technique = str(form.get("stroke_technique", "")).strip()
+    if stroke_technique not in STROKE_TECHNIQUE_LABELS:
+        raise ValidationError("击球技术类型非法，请从页面选项中选择。")
+
+    multi_ball_minutes = parse_int_range(
+        str(form.get("multi_ball_minutes", "")).strip(),
+        "多球训练时长",
+        0,
+        300,
+    )
+
+    intensity = str(form.get("intensity", "")).strip()
+    if intensity not in TECHNICAL_INTENSITY_LABELS:
+        raise ValidationError("训练强度非法，请从页面选项中选择。")
+
+    note = str(form.get("training_note", "")).strip()
+    if len(note) > 200:
+        raise ValidationError("训练备注不能超过 200 个字符。")
+
+    return {
+        "athlete_id": athlete_id,
+        "athlete_name": player["name"],
+        "training_date": training_date,
+        "footwork_type": footwork_type,
+        "stroke_technique": stroke_technique,
+        "multi_ball_minutes": multi_ball_minutes,
+        "intensity": intensity,
+        "note": note,
+    }
+
+
+def build_technical_training_summary(records):
+    total_minutes = sum(record["multi_ball_minutes"] for record in records)
+    intensity_counts = {key: 0 for key in TECHNICAL_INTENSITY_LABELS}
+    for record in records:
+        if record["intensity"] in intensity_counts:
+            intensity_counts[record["intensity"]] += 1
+    return {
+        "record_count": len(records),
+        "total_minutes": total_minutes,
+        "average_minutes": round(total_minutes / len(records), 1) if records else 0,
+        "high_intensity_count": intensity_counts["high"] + intensity_counts["extreme"],
+    }
+
+
+def resolve_athlete_id(value):
+    if value is None:
+        return ""
+    text = str(value).strip()
+    if text.isdigit():
+        return text
+    player = next(
+        (item for item in PLAYERS if item["name"] == text or item["student_no"] == text),
+        None,
+    )
+    return str(player["id"]) if player else text
+
+
+def resolve_option_code(value, options):
+    if value is None:
+        return ""
+    text = str(value).strip()
+    if text in options:
+        return text
+    for code, label in options.items():
+        if text == label:
+            return code
+    return text
+
+
+def normalize_excel_date(value):
+    if value is None:
+        return ""
+    if isinstance(value, datetime):
+        return value.strftime("%Y-%m-%d")
+    return str(value).strip()[:10]
+
 
 def validate_training_plan_data(athlete_id, coach_id, plan_datetime, content, intensity, duration):
     """校验训练计划数据，返回错误列表"""
