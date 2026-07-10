@@ -163,6 +163,22 @@ TECHNICAL_INTENSITY_LABELS = {
     "extreme": "极高强度",
 }
 
+PLAYER_LEVEL_LABELS = {
+    "national": "国家级",
+    "first": "一级运动员",
+    "second": "二级运动员",
+    "youth": "青年队",
+}
+
+PLAYER_INJURY_STATUS_LABELS = {
+    "healthy": "健康",
+    "observe": "观察中",
+    "rehab": "康复中",
+    "injured": "伤病中",
+}
+
+PLAYER_GENDER_OPTIONS = ["男", "女"]
+
 
 
 FITNESS_TESTS = [
@@ -621,17 +637,105 @@ def create_app():
             total_count=len(PLAYERS),
             active_condition_count=active_condition_count,
             logic=request.args.get("logic", "and"),
+            level_labels=PLAYER_LEVEL_LABELS,
+            injury_status_labels=PLAYER_INJURY_STATUS_LABELS,
+            gender_options=PLAYER_GENDER_OPTIONS,
         )
 
-    @players_bp.route("/create", endpoint="create")
+    @players_bp.route("/create", methods=["GET", "POST"], endpoint="create")
     @role_required("admin")
     def players_create():
-        return module_page("新增运动员", "建立运动员基础档案，并同步纳入队伍训练管理体系。")
+        if request.method == "POST":
+            try:
+                player = validate_player_form(request.form)
+                if any(item["student_no"] == player["student_no"] for item in PLAYERS):
+                    raise ValidationError("学号已存在，请更换后再提交。")
+                PLAYERS.append({"id": next_id(PLAYERS), **player})
+                flash("运动员档案创建成功。", "success")
+                return redirect(url_for("players.list"))
+            except ValidationError as exc:
+                flash(str(exc), "danger")
 
-    @players_bp.route("/<int:player_id>/edit", endpoint="edit")
+        return render_template(
+            "players/create.html",
+            level_labels=PLAYER_LEVEL_LABELS,
+            injury_status_labels=PLAYER_INJURY_STATUS_LABELS,
+            gender_options=PLAYER_GENDER_OPTIONS,
+        )
+
+    @players_bp.route("/<int:player_id>", endpoint="detail")
+    @role_required("admin", "coach")
+    def players_detail(player_id):
+        player = find_player(player_id)
+        if not player:
+            flash("运动员不存在。", "warning")
+            return redirect(url_for("players.list"))
+        return render_template(
+            "players/detail.html",
+            player=player,
+            training_plans=[item for item in TRAINING_PLANS if item["athlete_id"] == player_id],
+            technical_records=[
+                enrich_technical_record(item)
+                for item in TECHNICAL_TRAINING_RECORDS
+                if item["athlete_id"] == player_id
+            ],
+            fitness_tests=[
+                enrich_fitness_record(item)
+                for item in FITNESS_TESTS
+                if item["athlete_id"] == player_id
+            ],
+            injury_records=[
+                enrich_injury_record(item)
+                for item in INJURY_RECORDS
+                if item["athlete_id"] == player_id and not item.get("is_deleted")
+            ],
+            match_records=[
+                enrich_match_record(item)
+                for item in MATCH_RESULTS
+                if item["athlete_id"] == player_id
+            ],
+        )
+
+    @players_bp.route("/<int:player_id>/edit", methods=["GET", "POST"], endpoint="edit")
     @role_required("admin")
     def players_edit(player_id):
-        return module_page("编辑运动员", f"维护编号 {player_id} 运动员的档案信息、竞技特征和健康状态。")
+        player = find_player(player_id)
+        if not player:
+            flash("运动员不存在。", "warning")
+            return redirect(url_for("players.list"))
+
+        if request.method == "POST":
+            try:
+                validated = validate_player_form(request.form)
+                if any(
+                    item["id"] != player_id and item["student_no"] == validated["student_no"]
+                    for item in PLAYERS
+                ):
+                    raise ValidationError("学号已被其他运动员使用。")
+                player.update(validated)
+                flash("运动员档案更新成功。", "success")
+                return redirect(url_for("players.detail", player_id=player_id))
+            except ValidationError as exc:
+                flash(str(exc), "danger")
+
+        return render_template(
+            "players/edit.html",
+            player=player,
+            level_labels=PLAYER_LEVEL_LABELS,
+            injury_status_labels=PLAYER_INJURY_STATUS_LABELS,
+            gender_options=PLAYER_GENDER_OPTIONS,
+        )
+
+    @players_bp.route("/<int:player_id>/delete", methods=["POST"], endpoint="delete")
+    @role_required("admin")
+    def players_delete(player_id):
+        player = find_player(player_id)
+        if not player:
+            flash("运动员不存在。", "warning")
+        else:
+            PLAYERS.remove(player)
+            flash("运动员档案已删除。", "success")
+        return redirect(url_for("players.list"))
 
     training_bp = Blueprint("training", __name__, url_prefix="/training")
 
@@ -1241,6 +1345,56 @@ def filter_players(args):
         return [player for player in PLAYERS if any(check(player) for check in predicates)], len(predicates)
 
     return [player for player in PLAYERS if all(check(player) for check in predicates)], len(predicates)
+
+
+def validate_player_form(form):
+    student_no = form.get("student_no", "").strip()
+    name = form.get("name", "").strip()
+    gender = form.get("gender", "").strip()
+    age = parse_int_range(form.get("age", "").strip(), "年龄", 1, 80)
+    level_code = form.get("level_code", "").strip()
+    play_style = form.get("play_style", "").strip()
+    grip = form.get("grip", "").strip()
+    contact_phone = form.get("contact_phone", "").strip()
+    injury_status_code = form.get("injury_status_code", "healthy").strip()
+
+    if not student_no:
+        raise ValidationError("学号不能为空。")
+    if len(student_no) > 20:
+        raise ValidationError("学号不能超过 20 个字符。")
+    if not name:
+        raise ValidationError("姓名不能为空。")
+    if len(name) > 50:
+        raise ValidationError("姓名不能超过 50 个字符。")
+    if gender not in PLAYER_GENDER_OPTIONS:
+        raise ValidationError("请选择有效的性别。")
+    if level_code not in PLAYER_LEVEL_LABELS:
+        raise ValidationError("请选择有效的运动等级。")
+    if injury_status_code not in PLAYER_INJURY_STATUS_LABELS:
+        raise ValidationError("请选择有效的伤病状态。")
+    if len(play_style) > 100:
+        raise ValidationError("主打法不能超过 100 个字符。")
+    if len(grip) > 50:
+        raise ValidationError("握拍方式不能超过 50 个字符。")
+    if len(contact_phone) > 20:
+        raise ValidationError("联系电话不能超过 20 个字符。")
+
+    level = PLAYER_LEVEL_LABELS[level_code]
+    injury_status = PLAYER_INJURY_STATUS_LABELS[injury_status_code]
+    return {
+        "student_no": student_no,
+        "name": name,
+        "gender": gender,
+        "age": age,
+        "level": level,
+        "skill_level": level,
+        "level_code": level_code,
+        "play_style": play_style,
+        "grip": grip,
+        "contact_phone": contact_phone,
+        "injury_status": injury_status,
+        "injury_status_code": injury_status_code,
+    }
 
 
 def find_player(athlete_id):

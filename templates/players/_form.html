@@ -1,0 +1,60 @@
+{% set form_player = player if player is defined else {} %}
+<div class="col-12 col-md-6">
+    <label for="student_no" class="form-label">学号</label>
+    <input type="text" class="form-control" id="student_no" name="student_no" maxlength="20" required
+           value="{{ request.form.get('student_no', form_player.student_no or '') }}">
+</div>
+<div class="col-12 col-md-6">
+    <label for="name" class="form-label">姓名</label>
+    <input type="text" class="form-control" id="name" name="name" maxlength="50" required
+           value="{{ request.form.get('name', form_player.name or '') }}">
+</div>
+<div class="col-12 col-md-4">
+    <label for="gender" class="form-label">性别</label>
+    {% set selected_gender = request.form.get('gender', form_player.gender or '') %}
+    <select class="form-select" id="gender" name="gender" required>
+        <option value="">请选择</option>
+        {% for gender in gender_options %}
+            <option value="{{ gender }}" {% if selected_gender == gender %}selected{% endif %}>{{ gender }}</option>
+        {% endfor %}
+    </select>
+</div>
+<div class="col-12 col-md-4">
+    <label for="age" class="form-label">年龄</label>
+    <input type="number" class="form-control" id="age" name="age" min="1" max="80" required
+           value="{{ request.form.get('age', form_player.age or '') }}">
+</div>
+<div class="col-12 col-md-4">
+    <label for="level_code" class="form-label">运动等级</label>
+    {% set selected_level = request.form.get('level_code', form_player.level_code or '') %}
+    <select class="form-select" id="level_code" name="level_code" required>
+        <option value="">请选择</option>
+        {% for code, label in level_labels.items() %}
+            <option value="{{ code }}" {% if selected_level == code %}selected{% endif %}>{{ label }}</option>
+        {% endfor %}
+    </select>
+</div>
+<div class="col-12 col-md-6">
+    <label for="play_style" class="form-label">主打法</label>
+    <input type="text" class="form-control" id="play_style" name="play_style" maxlength="100"
+           value="{{ request.form.get('play_style', form_player.play_style or '') }}">
+</div>
+<div class="col-12 col-md-6">
+    <label for="grip" class="form-label">握拍方式</label>
+    <input type="text" class="form-control" id="grip" name="grip" maxlength="50"
+           value="{{ request.form.get('grip', form_player.grip or '') }}">
+</div>
+<div class="col-12 col-md-6">
+    <label for="contact_phone" class="form-label">联系电话</label>
+    <input type="text" class="form-control" id="contact_phone" name="contact_phone" maxlength="20"
+           value="{{ request.form.get('contact_phone', form_player.contact_phone or '') }}">
+</div>
+<div class="col-12 col-md-6">
+    <label for="injury_status_code" class="form-label">伤病状态</label>
+    {% set selected_status = request.form.get('injury_status_code', form_player.injury_status_code or 'healthy') %}
+    <select class="form-select" id="injury_status_code" name="injury_status_code">
+        {% for code, label in injury_status_labels.items() %}
+            <option value="{{ code }}" {% if selected_status == code %}selected{% endif %}>{{ label }}</option>
+        {% endfor %}
+    </select>
+</div>

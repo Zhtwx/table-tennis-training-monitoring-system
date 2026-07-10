@@ -1,0 +1,29 @@
+{% extends "base.html" %}
+
+{% block title %}编辑运动员 - 乒乓球运动员综合训练监控管理系统{% endblock %}
+
+{% block content %}
+<div class="d-flex align-items-center gap-3 mb-4">
+    <a href="{{ url_for('players.detail', player_id=player.id) }}" class="btn btn-outline-secondary btn-sm">返回</a>
+    <div>
+        <h1 class="page-title h3 mb-1">编辑运动员档案</h1>
+        <p class="text-secondary mb-0">修改 {{ player.name }}（{{ player.student_no }}）的基础资料。</p>
+    </div>
+</div>
+
+<div class="card shadow-sm">
+    <div class="card-header bg-white border-0 pt-4 px-4">
+        <h2 class="h5 mb-1">档案编辑</h2>
+        <p class="text-secondary small mb-0">修改后会同步影响训练、伤病、专项技术等关联页面的运动员显示。</p>
+    </div>
+    <div class="card-body">
+        <form method="post" action="{{ url_for('players.edit', player_id=player.id) }}" class="row g-3">
+            {% include "players/_form.html" %}
+            <div class="col-12 d-flex justify-content-end gap-2 border-top pt-3">
+                <a href="{{ url_for('players.detail', player_id=player.id) }}" class="btn btn-outline-secondary">取消</a>
+                <button type="submit" class="btn btn-primary">保存修改</button>
+            </div>
+        </form>
+    </div>
+</div>
+{% endblock %}

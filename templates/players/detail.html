@@ -1,0 +1,102 @@
+{% extends "base.html" %}
+
+{% block title %}{{ player.name }} - 运动员档案{% endblock %}
+
+{% block content %}
+<div class="d-flex flex-column flex-md-row align-items-md-center justify-content-between gap-3 mb-4">
+    <div>
+        <h1 class="page-title h3 mb-1">{{ player.name }} 的综合档案</h1>
+        <p class="text-secondary mb-0">{{ player.student_no }} · {{ player.gender }} · {{ player.age }} 岁 · {{ player.level }}</p>
+    </div>
+    <div class="d-flex gap-2">
+        {% if current_user.role == 'admin' %}
+            <a href="{{ url_for('players.edit', player_id=player.id) }}" class="btn btn-outline-primary">编辑档案</a>
+        {% endif %}
+        <a href="{{ url_for('players.list') }}" class="btn btn-outline-secondary">返回列表</a>
+    </div>
+</div>
+
+<div class="row g-4 mb-4">
+    <div class="col-12 col-lg-4">
+        <div class="card shadow-sm h-100">
+            <div class="card-header bg-white border-0 pt-4 px-4">
+                <h2 class="h5 mb-0">基础信息</h2>
+            </div>
+            <div class="card-body">
+                <dl class="row small mb-0">
+                    <dt class="col-5 text-secondary">学号</dt><dd class="col-7">{{ player.student_no }}</dd>
+                    <dt class="col-5 text-secondary">姓名</dt><dd class="col-7">{{ player.name }}</dd>
+                    <dt class="col-5 text-secondary">性别</dt><dd class="col-7">{{ player.gender }}</dd>
+                    <dt class="col-5 text-secondary">年龄</dt><dd class="col-7">{{ player.age }}</dd>
+                    <dt class="col-5 text-secondary">运动等级</dt><dd class="col-7">{{ player.level }}</dd>
+                    <dt class="col-5 text-secondary">主打法</dt><dd class="col-7">{{ player.play_style or '-' }}</dd>
+                    <dt class="col-5 text-secondary">握拍方式</dt><dd class="col-7">{{ player.grip or '-' }}</dd>
+                    <dt class="col-5 text-secondary">联系电话</dt><dd class="col-7">{{ player.contact_phone or '-' }}</dd>
+                    <dt class="col-5 text-secondary">伤病状态</dt><dd class="col-7">{{ player.injury_status }}</dd>
+                </dl>
+            </div>
+        </div>
+    </div>
+    <div class="col-12 col-lg-8">
+        <div class="row g-3">
+            <div class="col-6 col-xl-3">
+                <div class="card shadow-sm stat-card h-100"><div class="card-body"><div class="text-secondary small">训练计划</div><div class="fs-3 fw-bold">{{ training_plans|length }}</div></div></div>
+            </div>
+            <div class="col-6 col-xl-3">
+                <div class="card shadow-sm stat-card h-100"><div class="card-body"><div class="text-secondary small">专项记录</div><div class="fs-3 fw-bold">{{ technical_records|length }}</div></div></div>
+            </div>
+            <div class="col-6 col-xl-3">
+                <div class="card shadow-sm stat-card h-100"><div class="card-body"><div class="text-secondary small">体能测试</div><div class="fs-3 fw-bold">{{ fitness_tests|length }}</div></div></div>
+            </div>
+            <div class="col-6 col-xl-3">
+                <div class="card shadow-sm stat-card h-100"><div class="card-body"><div class="text-secondary small">伤病记录</div><div class="fs-3 fw-bold">{{ injury_records|length }}</div></div></div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<div class="row g-4">
+    <div class="col-12 col-xl-6">
+        <div class="card shadow-sm h-100">
+            <div class="card-header bg-white border-0 pt-4 px-4"><h2 class="h5 mb-0">近期专项技术记录</h2></div>
+            <div class="card-body">
+                {% if technical_records %}
+                    <div class="table-responsive">
+                        <table class="table table-sm">
+                            <thead><tr><th>日期</th><th>步法</th><th>击球</th><th>强度</th></tr></thead>
+                            <tbody>
+                                {% for record in technical_records[:5] %}
+                                <tr><td>{{ record.training_date }}</td><td>{{ record.footwork_label }}</td><td>{{ record.stroke_label }}</td><td>{{ record.intensity_label }}</td></tr>
+                                {% endfor %}
+                            </tbody>
+                        </table>
+                    </div>
+                {% else %}
+                    <p class="text-secondary mb-0">暂无专项技术记录。</p>
+                {% endif %}
+            </div>
+        </div>
+    </div>
+    <div class="col-12 col-xl-6">
+        <div class="card shadow-sm h-100">
+            <div class="card-header bg-white border-0 pt-4 px-4"><h2 class="h5 mb-0">近期伤病记录</h2></div>
+            <div class="card-body">
+                {% if injury_records %}
+                    <div class="table-responsive">
+                        <table class="table table-sm">
+                            <thead><tr><th>日期</th><th>部位</th><th>程度</th><th>状态</th></tr></thead>
+                            <tbody>
+                                {% for record in injury_records[:5] %}
+                                <tr><td>{{ record.injury_date }}</td><td>{{ record.injury_location }}</td><td>{{ record.severity }}</td><td>{{ record.recovery_status }}</td></tr>
+                                {% endfor %}
+                            </tbody>
+                        </table>
+                    </div>
+                {% else %}
+                    <p class="text-secondary mb-0">暂无伤病记录。</p>
+                {% endif %}
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}
