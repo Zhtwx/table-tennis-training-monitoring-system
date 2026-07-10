@@ -1,0 +1,97 @@
+{% extends "base.html" %}
+
+{% block title %}教练员信息管理 - 乒乓球运动员综合训练监控管理系统{% endblock %}
+
+{% block content %}
+<div class="d-flex flex-column flex-xl-row align-items-xl-end justify-content-between gap-3 mb-4">
+    <div>
+        <h1 class="page-title h3 mb-2">教练员信息管理</h1>
+        <p class="text-secondary mb-0">维护教练员基础信息、专项方向和训练关联情况。</p>
+    </div>
+    <a href="{{ url_for('coaches.add_coach') }}" class="btn btn-primary">添加教练员</a>
+</div>
+
+<div class="row g-3 mb-4">
+    <div class="col-12 col-md-4">
+        <div class="card stat-card h-100">
+            <div class="card-body">
+                <div class="text-secondary small mb-1">教练员总数</div>
+                <div class="fs-4 fw-bold">{{ coaches|length }}</div>
+            </div>
+        </div>
+    </div>
+    <div class="col-12 col-md-4">
+        <div class="card stat-card h-100">
+            <div class="card-body">
+                <div class="text-secondary small mb-1">关联运动员</div>
+                <div class="fs-4 fw-bold">{{ coaches|sum(attribute='player_count') if coaches else 0 }}</div>
+            </div>
+        </div>
+    </div>
+    <div class="col-12 col-md-4">
+        <div class="card stat-card h-100">
+            <div class="card-body">
+                <div class="text-secondary small mb-1">最新训练记录</div>
+                <div class="fs-6 fw-bold text-truncate">
+                    {% set latest = coaches|map(attribute='latest_training_date')|select|list|max if coaches else None %}
+                    {{ latest or '暂无记录' }}
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<div class="card">
+    <div class="card-header p-4">
+        <h2 class="h5 mb-1">教练员列表</h2>
+        <p class="text-secondary small mb-0">查看教练员专项、联系方式和最近训练时间。</p>
+    </div>
+    <div class="card-body p-0">
+        <div class="table-responsive">
+            <table class="table table-hover align-middle mb-0">
+                <thead>
+                    <tr>
+                        <th class="ps-4">ID</th>
+                        <th>姓名</th>
+                        <th>性别</th>
+                        <th>电话</th>
+                        <th>邮箱</th>
+                        <th>专项</th>
+                        <th>运动员数</th>
+                        <th>最新训练</th>
+                        <th class="text-end pe-4">操作</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for coach in coaches %}
+                    <tr>
+                        <td class="ps-4 text-secondary">{{ coach.id }}</td>
+                        <td class="fw-semibold">{{ coach.name }}</td>
+                        <td>{{ coach.gender }}</td>
+                        <td>{{ coach.phone or '-' }}</td>
+                        <td>{{ coach.email or '-' }}</td>
+                        <td>{{ coach.specialty or '-' }}</td>
+                        <td><span class="badge text-bg-light">{{ coach.player_count }}</span></td>
+                        <td>{{ coach.latest_training_date or '无记录' }}</td>
+                        <td class="text-end pe-4">
+                            <div class="btn-group btn-group-sm" role="group" aria-label="教练员操作">
+                                <a href="{{ url_for('coaches.coach_players', id=coach.id) }}" class="btn btn-outline-primary">运动员</a>
+                                <a href="{{ url_for('coaches.edit_coach', id=coach.id) }}" class="btn btn-outline-secondary">编辑</a>
+                                <form action="{{ url_for('coaches.delete_coach', id=coach.id) }}" method="POST" class="d-inline"
+                                      onsubmit="return confirm('确认删除该教练员吗？');">
+                                    <button type="submit" class="btn btn-outline-danger">删除</button>
+                                </form>
+                            </div>
+                        </td>
+                    </tr>
+                    {% else %}
+                    <tr>
+                        <td colspan="9" class="text-center text-secondary py-5">暂无教练员数据。</td>
+                    </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+    </div>
+</div>
+{% endblock %}

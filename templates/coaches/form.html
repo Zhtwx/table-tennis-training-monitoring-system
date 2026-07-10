@@ -1,0 +1,53 @@
+{% extends "base.html" %}
+
+{% block title %}{{ '编辑教练员' if coach else '添加教练员' }} - 乒乓球运动员综合训练监控管理系统{% endblock %}
+
+{% block content %}
+<div class="d-flex flex-column flex-xl-row align-items-xl-end justify-content-between gap-3 mb-4">
+    <div>
+        <h1 class="page-title h3 mb-2">{{ '编辑教练员' if coach else '添加教练员' }}</h1>
+        <p class="text-secondary mb-0">维护教练员基础信息、联系方式和专项方向。</p>
+    </div>
+    <a href="{{ url_for('coaches.list') }}" class="btn btn-outline-secondary">返回列表</a>
+</div>
+
+<div class="card">
+    <div class="card-header p-4">
+        <h2 class="h5 mb-1">基础信息</h2>
+        <p class="text-secondary small mb-0">带星号字段为必填项。</p>
+    </div>
+    <div class="card-body p-4">
+        <form method="POST" class="row g-3">
+            <div class="col-12 col-md-6">
+                <label for="name" class="form-label">姓名 *</label>
+                <input type="text" class="form-control" id="name" name="name" value="{{ coach.name if coach else '' }}" required>
+            </div>
+            <div class="col-12 col-md-6">
+                <label for="gender" class="form-label">性别 *</label>
+                <select class="form-select" id="gender" name="gender" required>
+                    <option value="男" {% if coach and coach.gender == '男' %}selected{% endif %}>男</option>
+                    <option value="女" {% if coach and coach.gender == '女' %}selected{% endif %}>女</option>
+                </select>
+            </div>
+            <div class="col-12 col-md-6">
+                <label for="phone" class="form-label">电话</label>
+                <input type="text" class="form-control" id="phone" name="phone" value="{{ coach.phone if coach else '' }}">
+            </div>
+            <div class="col-12 col-md-6">
+                <label for="email" class="form-label">邮箱</label>
+                <input type="email" class="form-control" id="email" name="email" value="{{ coach.email if coach else '' }}">
+            </div>
+            <div class="col-12">
+                <label for="specialty" class="form-label">专项</label>
+                <input type="text" class="form-control" id="specialty" name="specialty"
+                       value="{{ coach.specialty if coach else '' }}"
+                       placeholder="例如：发接发训练、体能恢复、青训培养">
+            </div>
+            <div class="col-12 d-flex flex-column flex-md-row justify-content-end gap-2">
+                <a href="{{ url_for('coaches.list') }}" class="btn btn-outline-secondary">取消</a>
+                <button type="submit" class="btn btn-primary">保存</button>
+            </div>
+        </form>
+    </div>
+</div>
+{% endblock %}

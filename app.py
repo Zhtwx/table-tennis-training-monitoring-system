@@ -38,6 +38,7 @@ USERS = {
 NAV_ITEMS = [
     {"label": "综合看板", "endpoint": "index", "roles": {"admin", "coach"}},
     {"label": "运动员档案", "endpoint": "players.list", "roles": {"admin", "coach"}},
+    {"label": "教练员信息", "endpoint": "coaches.list", "roles": {"admin", "coach"}},
     {"label": "训练计划", "endpoint": "training.plans", "roles": {"admin", "coach"}},
     {"label": "专项技术录入", "endpoint": "training.batch_import", "roles": {"admin", "coach"}},
     {"label": "体能测试", "endpoint": "fitness.tests", "roles": {"admin", "coach"}},
@@ -419,6 +420,8 @@ MODULE_FEATURES = {
 
 
 def create_app():
+    from coaches import bp as coaches_bp
+
     app = Flask(__name__)
     app.config["SECRET_KEY"] = "dev-secret-key-change-before-production"
 
@@ -892,6 +895,7 @@ def create_app():
         return module_page("系统配置", "维护系统基础参数、数据字典和导入模板规则。")
 
     app.register_blueprint(players_bp)
+    app.register_blueprint(coaches_bp)
     app.register_blueprint(training_bp)
     app.register_blueprint(injuries_bp)
     app.register_blueprint(fitness_bp)

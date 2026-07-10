@@ -1,0 +1,52 @@
+{% extends "base.html" %}
+
+{% block title %}{{ coach.name }} 的运动员 - 乒乓球运动员综合训练监控管理系统{% endblock %}
+
+{% block content %}
+<div class="d-flex flex-column flex-xl-row align-items-xl-end justify-content-between gap-3 mb-4">
+    <div>
+        <h1 class="page-title h3 mb-2">{{ coach.name }} - 关联运动员</h1>
+        <p class="text-secondary mb-0">查看该教练员参与训练计划的运动员基础档案和最近训练情况。</p>
+    </div>
+    <a href="{{ url_for('coaches.list') }}" class="btn btn-outline-secondary">返回教练员列表</a>
+</div>
+
+<div class="card">
+    <div class="card-header p-4">
+        <h2 class="h5 mb-1">运动员列表</h2>
+        <p class="text-secondary small mb-0">共 {{ players|length }} 名运动员。</p>
+    </div>
+    <div class="card-body p-0">
+        <div class="table-responsive">
+            <table class="table table-hover align-middle mb-0">
+                <thead>
+                    <tr>
+                        <th class="ps-4">姓名</th>
+                        <th>性别</th>
+                        <th>出生日期</th>
+                        <th>队伍</th>
+                        <th>运动等级</th>
+                        <th class="pe-4">最新训练</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for player in players %}
+                    <tr>
+                        <td class="ps-4 fw-semibold">{{ player.name }}</td>
+                        <td>{{ player.gender }}</td>
+                        <td>{{ player.birth_date or '-' }}</td>
+                        <td>{{ player.team or '-' }}</td>
+                        <td>{{ player.skill_level or '-' }}</td>
+                        <td class="pe-4">{{ player.latest_training_date or '无记录' }}</td>
+                    </tr>
+                    {% else %}
+                    <tr>
+                        <td colspan="6" class="text-center text-secondary py-5">该教练员暂无关联运动员。</td>
+                    </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+    </div>
+</div>
+{% endblock %}
