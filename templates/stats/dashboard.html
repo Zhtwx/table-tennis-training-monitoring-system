@@ -1,0 +1,226 @@
+{% extends "base.html" %}
+{% block title %}数据统计看板{% endblock %}
+{% block content %}
+<div class="container-fluid">
+    <div class="d-sm-flex align-items-center justify-content-between mb-4">
+        <h1 class="h3 mb-0 text-gray-800">数据统计看板</h1>
+    </div>
+
+    <!-- 顶部统计卡片 -->
+    <div class="row">
+        <div class="col-xl-3 col-md-6 mb-4">
+            <div class="card border-left-primary shadow h-100 py-2">
+                <div class="card-body">
+                    <div class="row no-gutters align-items-center">
+                        <div class="col mr-2">
+                            <div class="text-xs font-weight-bold text-primary text-uppercase mb-1">在册运动员总数</div>
+                            <div class="h5 mb-0 font-weight-bold text-gray-800">{{ stats.cards.total_athletes }} 人</div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+        <div class="col-xl-3 col-md-6 mb-4">
+            <div class="card border-left-success shadow h-100 py-2">
+                <div class="card-body">
+                    <div class="row no-gutters align-items-center">
+                        <div class="col mr-2">
+                            <div class="text-xs font-weight-bold text-success text-uppercase mb-1">本月累计训练时长</div>
+                            <div class="h5 mb-0 font-weight-bold text-gray-800">{{ stats.cards.current_month_duration }} 分钟</div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+        <div class="col-xl-3 col-md-6 mb-4">
+            <div class="card border-left-warning shadow h-100 py-2">
+                <div class="card-body">
+                    <div class="row no-gutters align-items-center">
+                        <div class="col mr-2">
+                            <div class="text-xs font-weight-bold text-warning text-uppercase mb-1">活跃伤病数量</div>
+                            <div class="h5 mb-0 font-weight-bold text-gray-800">{{ stats.cards.active_injuries }} 例</div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+        <div class="col-xl-3 col-md-6 mb-4">
+            <div class="card border-left-info shadow h-100 py-2">
+                <div class="card-body">
+                    <div class="row no-gutters align-items-center">
+                        <div class="col mr-2">
+                            <div class="text-xs font-weight-bold text-info text-uppercase mb-1">平均体能综合得分</div>
+                            <div class="h5 mb-0 font-weight-bold text-gray-800">{{ stats.cards.avg_fitness }} 分</div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- 图表第一行：训练趋势 + 伤病分布 -->
+    <div class="row">
+        <div class="col-xl-8 col-lg-7">
+            <div class="card shadow mb-4">
+                <div class="card-header py-3">
+                    <h6 class="m-0 font-weight-bold text-primary">月度训练时长趋势</h6>
+                </div>
+                <div class="card-body">
+                    <div id="trainTrendChart" style="height: 320px;"></div>
+                </div>
+            </div>
+        </div>
+        <div class="col-xl-4 col-lg-5">
+            <div class="card shadow mb-4">
+                <div class="card-header py-3">
+                    <h6 class="m-0 font-weight-bold text-primary">伤病部位分布</h6>
+                </div>
+                <div class="card-body">
+                    <div id="injuryPieChart" style="height: 320px;"></div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- 图表第二行：体能排名 + 强度占比 -->
+    <div class="row">
+        <div class="col-xl-6 col-lg-6">
+            <div class="card shadow mb-4">
+                <div class="card-header py-3">
+                    <h6 class="m-0 font-weight-bold text-primary">运动员体能得分排名</h6>
+                </div>
+                <div class="card-body">
+                    <div id="fitnessRankChart" style="height: 320px;"></div>
+                </div>
+            </div>
+        </div>
+        <div class="col-xl-6 col-lg-6">
+            <div class="card shadow mb-4">
+                <div class="card-header py-3">
+                    <h6 class="m-0 font-weight-bold text-primary">训练强度占比</h6>
+                </div>
+                <div class="card-body">
+                    <div id="intensityPieChart" style="height: 320px;"></div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- 图表第三行：专项技术得分趋势 -->
+    <div class="row">
+        <div class="col-xl-12 col-lg-12">
+            <div class="card shadow mb-4">
+                <div class="card-header py-3">
+                    <h6 class="m-0 font-weight-bold text-primary">月度专项技术平均得分趋势</h6>
+                </div>
+                <div class="card-body">
+                    <div id="skillTrendChart" style="height: 320px;"></div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- 统计数据JSON容器：分离模板语法与JS代码，消除编辑器报错 -->
+<script type="application/json" id="statsData">
+{{ stats|tojson }}
+</script>
+
+<!-- 引入ECharts可视化库 -->
+<script src="https://cdn.jsdelivr.net/npm/echarts@5.4.3/dist/echarts.min.js"></script>
+<script>
+// 读取统计数据
+const stats = JSON.parse(document.getElementById('statsData').textContent);
+
+// 1. 月度训练趋势图
+const trainTrendChart = echarts.init(document.getElementById('trainTrendChart'));
+trainTrendChart.setOption({
+    tooltip: { trigger: 'axis' },
+    legend: { data: ['训练时长(分钟)', '训练次数'] },
+    grid: { left: '3%', right: '4%', bottom: '3%', containLabel: true },
+    xAxis: { type: 'category', boundaryGap: false, data: stats.month_labels },
+    yAxis: [
+        { type: 'value', name: '时长(分钟)' },
+        { type: 'value', name: '次数' }
+    ],
+    series: [
+        { name: '训练时长(分钟)', type: 'line', smooth: true, data: stats.monthly_duration, itemStyle: { color: '#4e73df' } },
+        { name: '训练次数', type: 'line', yAxisIndex: 1, smooth: true, data: stats.monthly_train_count, itemStyle: { color: '#1cc88a' } }
+    ]
+});
+
+// 2. 伤病部位饼图
+const injuryPieChart = echarts.init(document.getElementById('injuryPieChart'));
+injuryPieChart.setOption({
+    tooltip: { trigger: 'item' },
+    legend: { orient: 'vertical', left: 'left' },
+    series: [{
+        name: '伤病数量',
+        type: 'pie',
+        radius: ['40%', '70%'],
+        itemStyle: { borderRadius: 10, borderColor: '#fff', borderWidth: 2 },
+        label: { show: false, position: 'center' },
+        emphasis: { label: { show: true, fontSize: 16, fontWeight: 'bold' } },
+        labelLine: { show: false },
+        data: stats.injury_pie
+    }]
+});
+
+// 3. 体能排名柱状图
+const fitnessRankChart = echarts.init(document.getElementById('fitnessRankChart'));
+fitnessRankChart.setOption({
+    tooltip: { trigger: 'axis', axisPointer: { type: 'shadow' } },
+    grid: { left: '3%', right: '4%', bottom: '3%', containLabel: true },
+    xAxis: { type: 'category', data: stats.fitness_player_names },
+    yAxis: { type: 'value', min: 0, max: 100, name: '得分' },
+    series: [{
+        name: '综合体能得分',
+        type: 'bar',
+        data: stats.fitness_player_scores,
+        itemStyle: { color: '#36b9cc' },
+        barWidth: '40%'
+    }]
+});
+
+// 4. 训练强度饼图
+const intensityPieChart = echarts.init(document.getElementById('intensityPieChart'));
+intensityPieChart.setOption({
+    tooltip: { trigger: 'item' },
+    legend: { bottom: '0%', left: 'center' },
+    series: [{
+        name: '训练计划数',
+        type: 'pie',
+        radius: '60%',
+        data: stats.intensity_pie,
+        emphasis: { itemStyle: { shadowBlur: 10, shadowOffsetX: 0, shadowColor: 'rgba(0, 0, 0, 0.5)' } }
+    }]
+});
+
+// 5. 专项技术趋势图
+const skillTrendChart = echarts.init(document.getElementById('skillTrendChart'));
+skillTrendChart.setOption({
+    tooltip: { trigger: 'axis' },
+    legend: { data: ['平均击球得分'] },
+    grid: { left: '3%', right: '4%', bottom: '3%', containLabel: true },
+    xAxis: { type: 'category', boundaryGap: false, data: stats.skill_month_labels },
+    yAxis: { type: 'value', min: 0, max: 100, name: '得分' },
+    series: [{
+        name: '平均击球得分',
+        type: 'line',
+        smooth: true,
+        data: stats.skill_month_scores,
+        itemStyle: { color: '#f6c23e' },
+        areaStyle: { opacity: 0.2 }
+    }]
+});
+
+// 窗口自适应
+window.addEventListener('resize', () => {
+    trainTrendChart.resize();
+    injuryPieChart.resize();
+    fitnessRankChart.resize();
+    intensityPieChart.resize();
+    skillTrendChart.resize();
+});
+</script>
+{% endblock %}

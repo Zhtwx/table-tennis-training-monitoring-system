@@ -1,0 +1,84 @@
+{% extends "base.html" %}
+{% block title %}数据导入导出中心{% endblock %}
+{% block content %}
+<div class="container-fluid">
+    <div class="d-sm-flex align-items-center justify-content-between mb-4">
+        <h1 class="h3 mb-0 text-gray-800">数据导入导出中心</h1>
+    </div>
+
+    <!-- 批量导入板块 -->
+    <div class="card shadow mb-4">
+        <div class="card-header py-3">
+            <h6 class="m-0 font-weight-bold text-primary">批量数据导入</h6>
+        </div>
+        <div class="card-body">
+            <div class="row">
+                <div class="col-lg-6">
+                    <div class="p-3 border rounded bg-light">
+                        <h5 class="mb-3">专项技术记录导入</h5>
+                        <p class="text-muted small mb-3">
+                            支持Excel格式导入，表头需包含：运动员姓名、训练日期、步法时长、击球得分、多球时长、训练强度<br>
+                            日期格式：YYYY-MM-DD，强度可选：低/中/高
+                        </p>
+                        <form method="post" action="{{ url_for('stats.import_export') }}" enctype="multipart/form-data">
+                            <input type="hidden" name="action" value="import_skill">
+                            <div class="form-group">
+                                <label>选择Excel文件</label>
+                                <input type="file" class="form-control-file" name="skill_excel" accept=".xlsx,.xls" required>
+                            </div>
+                            <button type="submit" class="btn btn-primary btn-sm">开始导入</button>
+                        </form>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- 数据导出板块 -->
+    <div class="card shadow mb-4">
+        <div class="card-header py-3">
+            <h6 class="m-0 font-weight-bold text-primary">数据导出</h6>
+        </div>
+        <div class="card-body">
+            <div class="row">
+                <div class="col-xl-3 col-md-6 mb-3">
+                    <div class="card border-left-primary h-100 py-2">
+                        <div class="card-body">
+                            <h6 class="font-weight-bold text-primary">全量数据导出</h6>
+                            <p class="small text-muted mb-3">导出训练计划、专项技术、体能测试、伤病记录4个Sheet</p>
+                            <a href="{{ url_for('stats.export_all') }}" class="btn btn-primary btn-sm">一键导出全量</a>
+                        </div>
+                    </div>
+                </div>
+                <div class="col-xl-3 col-md-6 mb-3">
+                    <div class="card border-left-success h-100 py-2">
+                        <div class="card-body">
+                            <h6 class="font-weight-bold text-success">训练计划导出</h6>
+                            <p class="small text-muted mb-3">导出全部训练计划数据</p>
+                            <a href="{{ url_for('training.export_plans') }}" class="btn btn-success btn-sm">导出训练计划</a>
+                        </div>
+                    </div>
+                </div>
+                <div class="col-xl-3 col-md-6 mb-3">
+                    <div class="card border-left-info h-100 py-2">
+                        <div class="card-body">
+                            <h6 class="font-weight-bold text-info">专项技术导出</h6>
+                            <p class="small text-muted mb-3">导出全部专项技术记录数据</p>
+                            <a href="{{ url_for('stats.export_skill') }}" class="btn btn-info btn-sm">导出技术记录</a>
+                        </div>
+                    </div>
+                </div>
+                <div class="col-xl-3 col-md-6 mb-3">
+                    <div class="card border-left-warning h-100 py-2">
+                        <div class="card-body">
+                            <h6 class="font-weight-bold text-warning">体能测试导出</h6>
+                            <p class="small text-muted mb-3">导出全部体能测试记录数据</p>
+                            <a href="{{ url_for('stats.export_fitness') }}" class="btn btn-warning btn-sm">导出体能数据</a>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}
