@@ -625,7 +625,7 @@ def create_app():
     @app.route("/")
     @role_required("admin", "coach")
     def index():
-        return render_template("index.html")
+        return render_template("index.html", dashboard=build_home_dashboard_data())
 
     players_bp = Blueprint("players", __name__, url_prefix="/players")
 
@@ -1938,6 +1938,54 @@ def build_overall_stats():
         "intensity_pie": intensity_pie,
         "skill_month_labels": skill_month_labels,
         "skill_month_scores": skill_month_scores,
+    }
+
+
+def build_home_dashboard_data():
+    stats = build_overall_stats()
+    intensity_order = ["低", "中", "高", "极高"]
+    intensity_month_map = {}
+    for plan in TRAINING_PLANS:
+        month_key = plan["plan_datetime"][:7]
+        month_stats = intensity_month_map.setdefault(
+            month_key,
+            {intensity: 0 for intensity in intensity_order},
+        )
+        month_stats[plan["intensity"]] = month_stats.get(plan["intensity"], 0) + plan["duration"]
+
+    intensity_month_labels = sorted(intensity_month_map)
+    intensity_series = [
+        {
+            "name": f"{intensity}强度",
+            "data": [intensity_month_map[month].get(intensity, 0) for month in intensity_month_labels],
+        }
+        for intensity in intensity_order
+    ]
+
+    if FITNESS_TESTS:
+        fitness_radar_values = [
+            round(sum(test["upper_strength"] for test in FITNESS_TESTS) / len(FITNESS_TESTS), 1),
+            round(sum(test["lower_strength"] for test in FITNESS_TESTS) / len(FITNESS_TESTS), 1),
+            round(sum(test["flexibility"] for test in FITNESS_TESTS) / len(FITNESS_TESTS), 1),
+            round(sum(test["endurance"] for test in FITNESS_TESTS) / len(FITNESS_TESTS), 1),
+            round(sum(test["speed"] for test in FITNESS_TESTS) / len(FITNESS_TESTS), 1),
+        ]
+    else:
+        fitness_radar_values = [0, 0, 0, 0, 0]
+
+    return {
+        "generated_at": datetime.now().strftime("%Y-%m-%d %H:%M"),
+        "cards": {
+            **stats["cards"],
+            "training_plan_count": len(TRAINING_PLANS),
+        },
+        "month_labels": stats["month_labels"],
+        "monthly_duration": stats["monthly_duration"],
+        "injury_pie": stats["injury_pie"],
+        "intensity_month_labels": intensity_month_labels,
+        "intensity_series": intensity_series,
+        "fitness_radar_values": fitness_radar_values,
+        "fitness_target_values": [85, 86, 82, 86, 88],
     }
 
 
