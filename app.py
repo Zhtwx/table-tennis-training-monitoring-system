@@ -3,7 +3,7 @@ import openpyxl
 from flask import send_file
 from openpyxl.styles import Font, Alignment
 from copy import deepcopy
-from datetime import datetime
+from datetime import datetime, timedelta
 from functools import wraps
 
 from flask import (
@@ -44,6 +44,8 @@ NAV_ITEMS = [
     {"label": "专项技术查询", "endpoint": "training.record", "roles": {"admin", "coach"}},
     {"label": "体能测试", "endpoint": "fitness.tests", "roles": {"admin", "coach"}},
     {"label": "伤病记录", "endpoint": "injuries.list", "roles": {"admin", "coach"}},
+    {"label": "数据统计", "endpoint": "stats.dashboard", "roles": {"admin", "coach"}},
+    {"label": "导入导出", "endpoint": "stats.import_export", "roles": {"admin", "coach"}},
     {"label": "康复跟踪", "endpoint": "rehab.list", "roles": {"admin", "coach"}},
     {"label": "比赛成绩", "endpoint": "matches.list", "roles": {"admin", "coach"}},
     {"label": "用户权限", "endpoint": "auth.users", "roles": {"admin"}},
@@ -1295,6 +1297,60 @@ def create_app():
             import_templates=build_import_templates(),
         )
 
+    stats_bp = Blueprint("stats", __name__, url_prefix="/stats")
+
+    @stats_bp.route("/dashboard", endpoint="dashboard")
+    @role_required("admin", "coach")
+    def stats_dashboard():
+        return render_template("stats/dashboard.html", stats=build_overall_stats())
+
+    @stats_bp.route("/import-export", methods=["GET", "POST"], endpoint="import_export")
+    @role_required("admin", "coach")
+    def stats_import_export():
+        if request.method == "POST":
+            action = request.form.get("action", "")
+            if action == "import_skill":
+                file = request.files.get("skill_excel")
+                if not file:
+                    flash("请先选择专项技术 Excel 文件。", "warning")
+                    return redirect(url_for("stats.import_export"))
+
+                imported_count, error_rows = import_stats_skill_excel(file, current_user()["username"])
+                if error_rows:
+                    flash(f"成功导入 {imported_count} 条专项技术记录，跳过 {len(error_rows)} 条异常数据。", "warning")
+                    for err in error_rows[:5]:
+                        flash(err, "warning")
+                else:
+                    flash(f"成功导入 {imported_count} 条专项技术记录。", "success")
+                return redirect(url_for("stats.import_export"))
+
+        return render_template("stats/import_export.html")
+
+    @stats_bp.route("/export/all", endpoint="export_all")
+    @role_required("admin", "coach")
+    def export_all_data():
+        wb = openpyxl.Workbook()
+        write_training_plan_sheet(wb.active, TRAINING_PLANS)
+        write_technical_record_sheet(wb.create_sheet("专项技术记录"), filter_technical_training_records(request.args)[0])
+        write_fitness_sheet(wb.create_sheet("体能测试记录"), FITNESS_TESTS)
+        write_injury_sheet(wb.create_sheet("伤病记录"), INJURY_RECORDS)
+        return send_workbook(wb, "table_tennis_training_all_data.xlsx")
+
+    @stats_bp.route("/export/skill", endpoint="export_skill")
+    @role_required("admin", "coach")
+    def export_skill_data():
+        records, _ = filter_technical_training_records(request.args)
+        wb = openpyxl.Workbook()
+        write_technical_record_sheet(wb.active, records)
+        return send_workbook(wb, "technical_training_records.xlsx")
+
+    @stats_bp.route("/export/fitness", endpoint="export_fitness")
+    @role_required("admin", "coach")
+    def export_fitness_data():
+        wb = openpyxl.Workbook()
+        write_fitness_sheet(wb.active, FITNESS_TESTS)
+        return send_workbook(wb, "fitness_tests.xlsx")
+
     app.register_blueprint(players_bp)
     app.register_blueprint(coaches_bp)
     app.register_blueprint(training_bp)
@@ -1304,6 +1360,7 @@ def create_app():
     app.register_blueprint(matches_bp)
     app.register_blueprint(auth_bp)
     app.register_blueprint(settings_bp)
+    app.register_blueprint(stats_bp)
 
     return app
 
@@ -1807,6 +1864,269 @@ def build_technical_training_summary(records):
     }
 
 
+def build_overall_stats():
+    monthly_training = {}
+    for plan in TRAINING_PLANS:
+        month_key = plan["plan_datetime"][:7]
+        stats = monthly_training.setdefault(month_key, {"duration": 0, "count": 0})
+        stats["duration"] += plan["duration"]
+        stats["count"] += 1
+
+    month_labels = sorted(monthly_training)
+    monthly_duration = [monthly_training[key]["duration"] for key in month_labels]
+    monthly_train_count = [monthly_training[key]["count"] for key in month_labels]
+
+    injury_locations = {}
+    for record in INJURY_RECORDS:
+        if record.get("is_deleted"):
+            continue
+        location = record["injury_location"]
+        injury_locations[location] = injury_locations.get(location, 0) + 1
+    injury_pie = [{"name": name, "value": value} for name, value in sorted(injury_locations.items())]
+
+    latest_fitness = {}
+    for test in sorted(FITNESS_TESTS, key=lambda item: item["test_date"]):
+        latest_fitness[test["athlete_id"]] = test
+    fitness_rank = []
+    for athlete_id, test in latest_fitness.items():
+        player = find_player(athlete_id)
+        if player:
+            fitness_rank.append({"name": player["name"], "score": test["overall_score"]})
+    fitness_rank.sort(key=lambda item: item["score"], reverse=True)
+
+    intensity_counts = {}
+    for plan in TRAINING_PLANS:
+        intensity = plan["intensity"]
+        intensity_counts[intensity] = intensity_counts.get(intensity, 0) + 1
+    intensity_pie = [{"name": name, "value": value} for name, value in sorted(intensity_counts.items())]
+
+    monthly_skill = {}
+    for record in TECHNICAL_TRAINING_RECORDS:
+        month_key = record["training_date"][:7]
+        score = calculate_technical_record_score(record)
+        stats = monthly_skill.setdefault(month_key, {"total": 0.0, "count": 0})
+        stats["total"] += score
+        stats["count"] += 1
+    skill_month_labels = sorted(monthly_skill)
+    skill_month_scores = [
+        round(monthly_skill[key]["total"] / monthly_skill[key]["count"], 1)
+        for key in skill_month_labels
+    ]
+
+    current_month = datetime.now().strftime("%Y-%m")
+    active_injury_statuses = {"治疗中", "康复中"}
+    active_injuries = sum(
+        1
+        for record in INJURY_RECORDS
+        if not record.get("is_deleted") and record["recovery_status"] in active_injury_statuses
+    )
+    fitness_scores = [item["score"] for item in fitness_rank]
+
+    return {
+        "cards": {
+            "total_athletes": len(PLAYERS),
+            "current_month_duration": monthly_training.get(current_month, {"duration": 0})["duration"],
+            "active_injuries": active_injuries,
+            "avg_fitness": round(sum(fitness_scores) / len(fitness_scores), 1) if fitness_scores else 0,
+        },
+        "month_labels": month_labels,
+        "monthly_duration": monthly_duration,
+        "monthly_train_count": monthly_train_count,
+        "injury_pie": injury_pie,
+        "fitness_player_names": [item["name"] for item in fitness_rank],
+        "fitness_player_scores": fitness_scores,
+        "intensity_pie": intensity_pie,
+        "skill_month_labels": skill_month_labels,
+        "skill_month_scores": skill_month_scores,
+    }
+
+
+def calculate_technical_record_score(record):
+    if record.get("hit_score") is not None:
+        return float(record["hit_score"])
+    intensity_score = {"low": 65, "medium": 75, "high": 85, "extreme": 95}.get(record["intensity"], 70)
+    minutes_bonus = min(record["multi_ball_minutes"], 60) / 60 * 5
+    return round(min(100, intensity_score + minutes_bonus), 1)
+
+
+def import_stats_skill_excel(file, operator):
+    imported_count = 0
+    error_rows = []
+    try:
+        wb = openpyxl.load_workbook(file)
+        ws = wb.active
+        for idx, row in enumerate(ws.iter_rows(min_row=2, values_only=True), start=2):
+            values = (list(row) + [None] * 7)[:7]
+            if not any(values):
+                continue
+
+            athlete_value, training_date, footwork_value, stroke_or_score, minutes_value, intensity_value, note_value = values
+            form, hit_score = build_stats_import_form(
+                athlete_value,
+                training_date,
+                footwork_value,
+                stroke_or_score,
+                minutes_value,
+                intensity_value,
+                note_value,
+            )
+            try:
+                save_technical_training_record(form, operator)
+                if hit_score is not None and TECHNICAL_TRAINING_RECORDS:
+                    TECHNICAL_TRAINING_RECORDS[-1]["hit_score"] = hit_score
+                imported_count += 1
+            except ValidationError as exc:
+                error_rows.append(f"第 {idx} 行：{exc}")
+    except Exception as exc:
+        error_rows.append(f"Excel 解析失败：{exc}")
+    return imported_count, error_rows
+
+
+def build_stats_import_form(
+    athlete_value,
+    training_date,
+    footwork_value,
+    stroke_or_score,
+    minutes_value,
+    intensity_value,
+    note_value,
+):
+    footwork_code = resolve_option_code(footwork_value, FOOTWORK_TYPE_LABELS)
+    footwork_note = ""
+    if footwork_code not in FOOTWORK_TYPE_LABELS:
+        footwork_note = f"步法时长：{footwork_value} 分钟"
+        footwork_code = "composite"
+
+    hit_score = parse_optional_float(stroke_or_score)
+    stroke_code = resolve_option_code(stroke_or_score, STROKE_TECHNIQUE_LABELS)
+    score_note = ""
+    if stroke_code not in STROKE_TECHNIQUE_LABELS:
+        score_note = f"击球得分：{stroke_or_score}"
+        stroke_code = "forehand_loop"
+    if hit_score is not None and not 0 <= hit_score <= 100:
+        raise ValidationError("击球得分必须在 0 到 100 之间。")
+
+    note_parts = [str(note_value).strip()] if note_value else []
+    note_parts.extend(part for part in [footwork_note, score_note] if part)
+
+    return {
+        "athlete_id": resolve_athlete_id(athlete_value),
+        "training_date": normalize_excel_date(training_date),
+        "footwork_type": footwork_code,
+        "stroke_technique": stroke_code,
+        "multi_ball_minutes": "" if minutes_value is None else str(minutes_value),
+        "intensity": resolve_technical_intensity_code(intensity_value),
+        "training_note": "；".join(note_parts),
+    }, hit_score
+
+
+def parse_optional_float(value):
+    if value in (None, ""):
+        return None
+    try:
+        return float(value)
+    except (TypeError, ValueError):
+        return None
+
+
+def resolve_technical_intensity_code(value):
+    text = "" if value is None else str(value).strip()
+    direct_map = {"低": "low", "中": "medium", "高": "high", "极高": "extreme"}
+    if text in direct_map:
+        return direct_map[text]
+    return resolve_option_code(text, TECHNICAL_INTENSITY_LABELS)
+
+
+def send_workbook(workbook, filename):
+    buffer = io.BytesIO()
+    workbook.save(buffer)
+    buffer.seek(0)
+    return send_file(
+        buffer,
+        as_attachment=True,
+        download_name=filename,
+        mimetype="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+    )
+
+
+def write_headers(ws, headers):
+    for col, header in enumerate(headers, 1):
+        cell = ws.cell(row=1, column=col, value=header)
+        cell.font = Font(bold=True)
+        cell.alignment = Alignment(horizontal="center")
+
+
+def write_training_plan_sheet(ws, plans):
+    ws.title = "训练计划"
+    headers = ["运动员", "教练", "训练时间", "训练内容", "训练强度", "训练时长(分钟)", "训练地点"]
+    write_headers(ws, headers)
+    for row_idx, plan in enumerate(plans, 2):
+        ws.cell(row=row_idx, column=1, value=plan["athlete_name"])
+        ws.cell(row=row_idx, column=2, value=plan["coach_name"])
+        ws.cell(row=row_idx, column=3, value=plan["plan_datetime"])
+        ws.cell(row=row_idx, column=4, value=plan["content"])
+        ws.cell(row=row_idx, column=5, value=plan["intensity"])
+        ws.cell(row=row_idx, column=6, value=plan["duration"])
+        ws.cell(row=row_idx, column=7, value=plan.get("location", ""))
+
+
+def write_technical_record_sheet(ws, records):
+    ws.title = "专项技术记录"
+    headers = ["运动员", "训练日期", "步法训练", "击球技术", "多球时长", "训练强度", "击球得分", "备注"]
+    write_headers(ws, headers)
+    for row_idx, record in enumerate(records, 2):
+        enriched = enrich_technical_record(record)
+        ws.cell(row=row_idx, column=1, value=enriched["athlete_name"])
+        ws.cell(row=row_idx, column=2, value=enriched["training_date"])
+        ws.cell(row=row_idx, column=3, value=enriched["footwork_label"])
+        ws.cell(row=row_idx, column=4, value=enriched["stroke_label"])
+        ws.cell(row=row_idx, column=5, value=enriched["multi_ball_minutes"])
+        ws.cell(row=row_idx, column=6, value=enriched["intensity_label"])
+        ws.cell(row=row_idx, column=7, value=enriched.get("hit_score", ""))
+        ws.cell(row=row_idx, column=8, value=enriched["note"])
+
+
+def write_fitness_sheet(ws, tests):
+    ws.title = "体能测试记录"
+    headers = ["运动员", "测试日期", "测试教练", "上肢力量", "下肢力量", "柔韧性", "耐力", "速度", "综合得分", "备注"]
+    write_headers(ws, headers)
+    for row_idx, test in enumerate(tests, 2):
+        player = find_player(test["athlete_id"])
+        coach = next((item for item in COACHES if item["id"] == test["tester_id"]), None)
+        ws.cell(row=row_idx, column=1, value=player["name"] if player else "未知运动员")
+        ws.cell(row=row_idx, column=2, value=test["test_date"])
+        ws.cell(row=row_idx, column=3, value=coach["name"] if coach else "未知教练")
+        ws.cell(row=row_idx, column=4, value=test["upper_strength"])
+        ws.cell(row=row_idx, column=5, value=test["lower_strength"])
+        ws.cell(row=row_idx, column=6, value=test["flexibility"])
+        ws.cell(row=row_idx, column=7, value=test["endurance"])
+        ws.cell(row=row_idx, column=8, value=test["speed"])
+        ws.cell(row=row_idx, column=9, value=test["overall_score"])
+        ws.cell(row=row_idx, column=10, value=test.get("notes", ""))
+
+
+def write_injury_sheet(ws, records):
+    ws.title = "伤病记录"
+    headers = ["运动员", "伤病日期", "伤病部位", "伤病类型", "严重程度", "诊断说明", "处理方案", "恢复状态", "预计恢复日期", "备注"]
+    write_headers(ws, headers)
+    row_idx = 2
+    for record in records:
+        if record.get("is_deleted"):
+            continue
+        player = find_player(record["athlete_id"])
+        ws.cell(row=row_idx, column=1, value=player["name"] if player else "未知运动员")
+        ws.cell(row=row_idx, column=2, value=record["injury_date"])
+        ws.cell(row=row_idx, column=3, value=record["injury_location"])
+        ws.cell(row=row_idx, column=4, value=record["injury_type"])
+        ws.cell(row=row_idx, column=5, value=record["severity"])
+        ws.cell(row=row_idx, column=6, value=record.get("diagnosis", ""))
+        ws.cell(row=row_idx, column=7, value=record.get("treatment", ""))
+        ws.cell(row=row_idx, column=8, value=record["recovery_status"])
+        ws.cell(row=row_idx, column=9, value=record.get("expected_recovery_date", ""))
+        ws.cell(row=row_idx, column=10, value=record.get("notes", ""))
+        row_idx += 1
+
+
 def resolve_athlete_id(value):
     if value is None:
         return ""
@@ -1837,6 +2157,8 @@ def normalize_excel_date(value):
         return ""
     if isinstance(value, datetime):
         return value.strftime("%Y-%m-%d")
+    if isinstance(value, (int, float)):
+        return (datetime(1899, 12, 30) + timedelta(days=int(value))).strftime("%Y-%m-%d")
     return str(value).strip()[:10]
 
 

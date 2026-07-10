@@ -17,8 +17,8 @@
                     <div class="p-3 border rounded bg-light">
                         <h5 class="mb-3">专项技术记录导入</h5>
                         <p class="text-muted small mb-3">
-                            支持Excel格式导入，表头需包含：运动员姓名、训练日期、步法时长、击球得分、多球时长、训练强度<br>
-                            日期格式：YYYY-MM-DD，强度可选：低/中/高
+                            支持Excel格式导入，兼容：运动员、训练日期、步法训练、击球技术、多球时长、训练强度、备注<br>
+                            也兼容成员9格式：运动员姓名、训练日期、步法时长、击球得分、多球时长、训练强度
                         </p>
                         <form method="post" action="{{ url_for('stats.import_export') }}" enctype="multipart/form-data">
                             <input type="hidden" name="action" value="import_skill">
