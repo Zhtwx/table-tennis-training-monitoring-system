@@ -3,10 +3,23 @@
 -- 依赖脚本: sql/pingpang_db.sql
 -- MySQL 5.5 兼容
 -- 用法:
+--   mysql -u root -p < sql/pingpang_db.sql
 --   mysql -u root -p pingpang_db < sql/member2_advanced_database.sql
 -- ============================================================
 
 USE pingpang_db;
+
+
+-- ============================================================
+-- 第零部分: 约束增强（软删除字段）
+-- 说明: 成员 8 伤病模块依赖 is_deleted；基础建表脚本尚未包含这些列。
+-- ============================================================
+
+ALTER TABLE injury_record
+    ADD COLUMN is_deleted TINYINT(1) NOT NULL DEFAULT 0 AFTER notes,
+    ADD COLUMN deleted_at DATETIME NULL AFTER is_deleted,
+    ADD COLUMN deleted_by VARCHAR(50) NULL AFTER deleted_at,
+    ADD COLUMN delete_reason VARCHAR(200) NULL AFTER deleted_by;
 
 
 -- ============================================================
@@ -30,9 +43,10 @@ CREATE INDEX idx_technical_record_evaluator_date ON technical_record(evaluator_i
 CREATE INDEX idx_fitness_report_athlete_date ON fitness_report(athlete_id, test_date);
 CREATE INDEX idx_fitness_report_tester_date ON fitness_report(tester_id, test_date);
 
--- 伤病记录: 支持康复跟踪和预警筛选。
+-- 伤病记录: 支持康复跟踪、预警筛选，以及有效记录（未作废）查询。
 CREATE INDEX idx_injury_record_athlete_status ON injury_record(athlete_id, recovery_status);
 CREATE INDEX idx_injury_record_recovery_date ON injury_record(recovery_status, expected_recovery_date);
+CREATE INDEX idx_injury_record_active ON injury_record(athlete_id, is_deleted, recovery_status);
 
 -- 比赛记录: 支持按运动员、比赛日期和赛果统计。
 CREATE INDEX idx_match_record_athlete_date ON match_record(athlete_id, match_date);
@@ -48,6 +62,7 @@ DROP VIEW IF EXISTS v_monthly_training_summary;
 
 -- 视图 1: 运动员综合档案视图
 -- 用途: 运动员档案页、统计大屏、教练综合评估。
+-- 说明: 伤病统计排除已软删除（is_deleted=1）的记录。
 CREATE VIEW v_athlete_comprehensive_profile AS
 SELECT
     a.id AS athlete_id,
@@ -64,8 +79,11 @@ SELECT
     ROUND(AVG(tr.overall_score), 2) AS avg_technical_score,
     COUNT(DISTINCT fr.id) AS fitness_report_count,
     ROUND(AVG(fr.overall_score), 2) AS avg_fitness_score,
-    COUNT(DISTINCT ir.id) AS injury_record_count,
-    COUNT(DISTINCT CASE WHEN ir.recovery_status IN ('治疗中','康复中') THEN ir.id END) AS active_injury_count,
+    COUNT(DISTINCT CASE WHEN ir.is_deleted = 0 THEN ir.id END) AS injury_record_count,
+    COUNT(DISTINCT CASE
+        WHEN ir.is_deleted = 0 AND ir.recovery_status IN ('治疗中','康复中')
+        THEN ir.id
+    END) AS active_injury_count,
     COUNT(DISTINCT mr.id) AS match_count,
     COUNT(DISTINCT CASE WHEN mr.result = '胜' THEN mr.id END) AS win_count
 FROM athlete a
@@ -78,8 +96,9 @@ GROUP BY
     a.id, a.student_no, a.name, a.gender, a.team,
     a.skill_level, a.play_style, a.grip, a.injury_status;
 
--- 视图 2: 月度训练汇总视图
+-- 视图 2: 月度技术训练汇总视图
 -- 用途: 成员 9 统计分析与 ECharts 图表数据源。
+-- 说明: 数据来源于 technical_record（专项技术评分），按月汇总。
 CREATE VIEW v_monthly_training_summary AS
 SELECT
     a.id AS athlete_id,
@@ -154,24 +173,31 @@ END$$
 
 -- 存储过程 3: 刷新单个运动员伤病状态
 -- 由触发器复用，保证 athlete.injury_status 与 injury_record 保持一致。
+-- 修复说明:
+--   1. 无活跃伤病时，IFNULL 兜底为「健康」，避免把 NOT NULL 字段写成 NULL。
+--   2. 仅统计未软删除（is_deleted=0）且未恢复的伤病记录。
 CREATE PROCEDURE sp_refresh_athlete_injury_status(IN p_athlete_id INT)
 BEGIN
+    DECLARE v_status VARCHAR(20);
+
+    SELECT
+        CASE
+            WHEN SUM(CASE WHEN recovery_status = '治疗中' AND severity = '严重' THEN 1 ELSE 0 END) > 0
+                THEN '伤病中'
+            WHEN SUM(CASE WHEN recovery_status = '治疗中' THEN 1 ELSE 0 END) > 0
+                THEN '观察中'
+            WHEN SUM(CASE WHEN recovery_status = '康复中' THEN 1 ELSE 0 END) > 0
+                THEN '康复中'
+            ELSE '健康'
+        END
+    INTO v_status
+    FROM injury_record
+    WHERE athlete_id = p_athlete_id
+      AND is_deleted = 0
+      AND recovery_status IN ('治疗中','康复中');
+
     UPDATE athlete
-    SET injury_status = (
-        SELECT
-            CASE
-                WHEN SUM(CASE WHEN recovery_status = '治疗中' AND severity = '严重' THEN 1 ELSE 0 END) > 0
-                    THEN '伤病中'
-                WHEN SUM(CASE WHEN recovery_status = '治疗中' THEN 1 ELSE 0 END) > 0
-                    THEN '观察中'
-                WHEN SUM(CASE WHEN recovery_status = '康复中' THEN 1 ELSE 0 END) > 0
-                    THEN '康复中'
-                ELSE '健康'
-            END
-        FROM injury_record
-        WHERE athlete_id = p_athlete_id
-          AND recovery_status IN ('治疗中','康复中')
-    )
+    SET injury_status = IFNULL(v_status, '健康')
     WHERE id = p_athlete_id;
 END$$
 
@@ -197,6 +223,7 @@ BEGIN
 END$$
 
 -- 修改伤病记录后刷新运动员健康状态；若记录转移到其他运动员，同时刷新旧运动员。
+-- 软删除（UPDATE is_deleted=1）也会走本触发器，从而自动回算健康状态。
 CREATE TRIGGER trg_injury_after_update
 AFTER UPDATE ON injury_record
 FOR EACH ROW
@@ -207,7 +234,7 @@ BEGIN
     END IF;
 END$$
 
--- 删除伤病记录后刷新运动员健康状态。
+-- 物理删除伤病记录后刷新运动员健康状态。
 CREATE TRIGGER trg_injury_after_delete
 AFTER DELETE ON injury_record
 FOR EACH ROW
@@ -234,5 +261,7 @@ FLUSH PRIVILEGES;
 -- ============================================================
 
 SELECT '>>> member2 advanced database objects setup complete! <<<' AS status;
+SHOW COLUMNS FROM injury_record LIKE 'is_deleted';
 SHOW INDEX FROM athlete;
+SHOW INDEX FROM injury_record;
 SHOW FULL TABLES WHERE Table_type = 'VIEW';
