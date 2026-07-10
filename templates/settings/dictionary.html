@@ -1,0 +1,125 @@
+{% extends "base.html" %}
+
+{% block title %}系统配置 - 乒乓球运动员综合训练监控管理系统{% endblock %}
+
+{% block content %}
+<div class="d-flex flex-column flex-md-row align-items-md-center justify-content-between gap-3 mb-4">
+    <div>
+        <h1 class="page-title h3 mb-1">系统配置</h1>
+        <p class="text-secondary mb-0">集中维护基础参数、数据字典、导入模板和数据库考核检查项。</p>
+    </div>
+    <span class="badge text-bg-primary align-self-start align-self-md-center">管理员模块</span>
+</div>
+
+<div class="row g-4 mb-4">
+    <div class="col-12 col-xl-5">
+        <div class="card shadow-sm h-100">
+            <div class="card-header bg-white border-0 pt-4 px-4">
+                <h2 class="h5 mb-1">基础参数</h2>
+                <p class="text-secondary small mb-0">用于统一演示口径和业务默认值。</p>
+            </div>
+            <div class="card-body">
+                <div class="table-responsive">
+                    <table class="table table-hover align-middle">
+                        <thead class="table-light">
+                            <tr>
+                                <th>参数</th>
+                                <th>当前值</th>
+                                <th>责任方</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            {% for item in parameters %}
+                            <tr>
+                                <td class="fw-semibold">{{ item.name }}</td>
+                                <td>{{ item.value }}</td>
+                                <td>{{ item.owner }}</td>
+                            </tr>
+                            {% endfor %}
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+        </div>
+    </div>
+    <div class="col-12 col-xl-7">
+        <div class="card shadow-sm h-100">
+            <div class="card-header bg-white border-0 pt-4 px-4">
+                <h2 class="h5 mb-1">数据字典</h2>
+                <p class="text-secondary small mb-0">覆盖表单下拉项、查询条件和数据库 ENUM 字段。</p>
+            </div>
+            <div class="card-body">
+                <div class="row g-3">
+                    {% for group in dictionary_groups %}
+                    <div class="col-12 col-lg-6">
+                        <div class="border rounded-3 p-3 h-100 bg-light">
+                            <div class="fw-semibold mb-2">{{ group.name }}</div>
+                            <div class="d-flex flex-wrap gap-2">
+                                {% for item in group["items"] %}
+                                    <span class="badge text-bg-secondary">{{ item }}</span>
+                                {% endfor %}
+                            </div>
+                        </div>
+                    </div>
+                    {% endfor %}
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<div class="row g-4">
+    <div class="col-12 col-xl-7">
+        <div class="card shadow-sm h-100">
+            <div class="card-header bg-white border-0 pt-4 px-4">
+                <h2 class="h5 mb-1">系统运行检查</h2>
+                <p class="text-secondary small mb-0">对照项目要求检查表结构、视图、存储过程、触发器、事务和权限。</p>
+            </div>
+            <div class="card-body">
+                <div class="table-responsive">
+                    <table class="table table-hover align-middle">
+                        <thead class="table-light">
+                            <tr>
+                                <th>检查项</th>
+                                <th>要求</th>
+                                <th>状态</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            {% for item in health_checks %}
+                            <tr>
+                                <td class="fw-semibold">{{ item.item }}</td>
+                                <td>{{ item.target }}</td>
+                                <td><span class="badge text-bg-{{ item.class }}">{{ item.status }}</span></td>
+                            </tr>
+                            {% endfor %}
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+        </div>
+    </div>
+    <div class="col-12 col-xl-5">
+        <div class="card shadow-sm h-100">
+            <div class="card-header bg-white border-0 pt-4 px-4">
+                <h2 class="h5 mb-1">导入模板字段</h2>
+                <p class="text-secondary small mb-0">面向 Excel 批量导入和后续数据校验。</p>
+            </div>
+            <div class="card-body">
+                <div class="vstack gap-3">
+                    {% for template in import_templates %}
+                    <div class="border rounded-3 p-3 bg-light">
+                        <div class="fw-semibold mb-2">{{ template.name }}</div>
+                        <div class="d-flex flex-wrap gap-2">
+                            {% for field in template.fields %}
+                                <span class="badge text-bg-light border text-dark">{{ field }}</span>
+                            {% endfor %}
+                        </div>
+                    </div>
+                    {% endfor %}
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}

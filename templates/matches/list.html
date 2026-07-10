@@ -1,0 +1,223 @@
+{% extends "base.html" %}
+
+{% block title %}比赛成绩 - 乒乓球运动员综合训练监控管理系统{% endblock %}
+
+{% block extra_css %}
+<style>
+    .match-stat {
+        border-left: 4px solid var(--tt-primary);
+    }
+
+    .chart-box-sm {
+        width: 100%;
+        height: 300px;
+    }
+</style>
+{% endblock %}
+
+{% block content %}
+<div class="d-flex flex-column flex-md-row align-items-md-center justify-content-between gap-3 mb-4">
+    <div>
+        <h1 class="page-title h3 mb-1">比赛成绩报告</h1>
+        <p class="text-secondary mb-0">记录比赛结果、比分、对手和技战术复盘，支撑阶段训练调整。</p>
+    </div>
+    <a href="{{ url_for('training.plans') }}" class="btn btn-outline-secondary">关联训练计划</a>
+</div>
+
+<div class="row g-3 mb-4">
+    <div class="col-6 col-xl-3">
+        <div class="card shadow-sm match-stat h-100">
+            <div class="card-body">
+                <div class="text-secondary small">比赛记录</div>
+                <div class="fs-3 fw-bold">{{ summary.record_count }}</div>
+            </div>
+        </div>
+    </div>
+    <div class="col-6 col-xl-3">
+        <div class="card shadow-sm match-stat h-100">
+            <div class="card-body">
+                <div class="text-secondary small">胜场</div>
+                <div class="fs-3 fw-bold text-success">{{ summary.win_count }}</div>
+            </div>
+        </div>
+    </div>
+    <div class="col-6 col-xl-3">
+        <div class="card shadow-sm match-stat h-100">
+            <div class="card-body">
+                <div class="text-secondary small">负场</div>
+                <div class="fs-3 fw-bold text-danger">{{ summary.loss_count }}</div>
+            </div>
+        </div>
+    </div>
+    <div class="col-6 col-xl-3">
+        <div class="card shadow-sm match-stat h-100">
+            <div class="card-body">
+                <div class="text-secondary small">胜率</div>
+                <div class="fs-3 fw-bold">{{ summary.win_rate }}%</div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<div class="card shadow-sm mb-4">
+    <div class="card-header bg-white border-0 pt-4 px-4">
+        <h2 class="h5 mb-1">比赛成绩查询</h2>
+        <p class="text-secondary small mb-0">按运动员、比赛日期、对手和比赛结果组合筛选。</p>
+    </div>
+    <div class="card-body">
+        <form class="row g-3 align-items-end" method="get" action="{{ url_for('matches.list') }}">
+            <div class="col-12 col-md-3">
+                <label for="player_keyword" class="form-label">运动员关键词</label>
+                <input type="text" class="form-control" id="player_keyword" name="player_keyword"
+                       value="{{ request.args.get('player_keyword', '') }}" placeholder="姓名或学号">
+            </div>
+            <div class="col-6 col-md-2">
+                <label for="date_from" class="form-label">开始日期</label>
+                <input type="date" class="form-control" id="date_from" name="date_from" value="{{ request.args.get('date_from', '') }}">
+            </div>
+            <div class="col-6 col-md-2">
+                <label for="date_to" class="form-label">结束日期</label>
+                <input type="date" class="form-control" id="date_to" name="date_to" value="{{ request.args.get('date_to', '') }}">
+            </div>
+            <div class="col-6 col-md-2">
+                <label for="result" class="form-label">比赛结果</label>
+                <select class="form-select" id="result" name="result">
+                    <option value="">不限</option>
+                    {% for option in result_options %}
+                        <option value="{{ option }}" {% if request.args.get('result') == option %}selected{% endif %}>{{ option }}</option>
+                    {% endfor %}
+                </select>
+            </div>
+            <div class="col-6 col-md-2">
+                <label for="opponent_keyword" class="form-label">对手关键词</label>
+                <input type="text" class="form-control" id="opponent_keyword" name="opponent_keyword"
+                       value="{{ request.args.get('opponent_keyword', '') }}" placeholder="对手姓名">
+            </div>
+            <div class="col-6 col-md-1 d-grid">
+                <button type="submit" class="btn btn-primary">查询</button>
+            </div>
+            <div class="col-6 col-md-1 d-grid">
+                <a href="{{ url_for('matches.list') }}" class="btn btn-outline-secondary">重置</a>
+            </div>
+        </form>
+        <div class="mt-3 text-secondary small">
+            当前命中 {{ match_records|length }} 条记录，共 {{ total_count }} 条，启用 {{ active_condition_count }} 个查询条件。
+        </div>
+    </div>
+</div>
+
+<div class="row g-4 mb-4">
+    <div class="col-12 col-xl-5">
+        <div class="card shadow-sm h-100">
+            <div class="card-header bg-white border-0 pt-4 px-4">
+                <h2 class="h5 mb-1">比赛成绩统计</h2>
+            </div>
+            <div class="card-body">
+                <div id="matchResultChart" class="chart-box-sm"></div>
+            </div>
+        </div>
+    </div>
+    <div class="col-12 col-xl-7">
+        <div class="card shadow-sm h-100">
+            <div class="card-header bg-white border-0 pt-4 px-4">
+                <h2 class="h5 mb-1">运动员胜率排行</h2>
+            </div>
+            <div class="card-body">
+                <div class="table-responsive">
+                    <table class="table table-sm align-middle">
+                        <thead>
+                            <tr>
+                                <th>运动员</th>
+                                <th>场次</th>
+                                <th>胜率</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            {% for item in summary.player_rates %}
+                            <tr>
+                                <td>{{ item.name }}</td>
+                                <td>{{ item.matches }}</td>
+                                <td>{{ item.win_rate }}%</td>
+                            </tr>
+                            {% else %}
+                            <tr><td colspan="3" class="text-secondary">暂无排行数据。</td></tr>
+                            {% endfor %}
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<div class="card shadow-sm">
+    <div class="card-header bg-white border-0 pt-4 px-4">
+        <h2 class="h5 mb-1">成绩与技战术复盘</h2>
+        <p class="text-secondary small mb-0">记录比分、名次、关键分和训练改进方向。</p>
+    </div>
+    <div class="card-body">
+        <div class="table-responsive">
+            <table class="table table-hover align-middle">
+                <thead class="table-light">
+                    <tr>
+                        <th>日期</th>
+                        <th>运动员</th>
+                        <th>比赛</th>
+                        <th>对手</th>
+                        <th>比分</th>
+                        <th>关键分复盘</th>
+                        <th>改进方向</th>
+                        <th class="text-end">结果</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for record in match_records %}
+                    <tr>
+                        <td class="text-nowrap">{{ record.match_date }}</td>
+                        <td>
+                            <div class="fw-semibold">{{ record.player_name }}</div>
+                            <div class="text-secondary small">{{ record.student_no }} · {{ record.level }}</div>
+                        </td>
+                        <td>
+                            <div>{{ record.match_name }}</div>
+                            <div class="text-secondary small">{{ record.rank }}</div>
+                        </td>
+                        <td>{{ record.opponent }}</td>
+                        <td class="fw-semibold">{{ record.score }}</td>
+                        <td class="small">{{ record.key_points }}</td>
+                        <td class="small">{{ record.improvement }}</td>
+                        <td class="text-end"><span class="badge text-bg-{{ record.result_class }}">{{ record.result }}</span></td>
+                    </tr>
+                    {% else %}
+                    <tr>
+                        <td colspan="8" class="text-center text-secondary py-5">暂无比赛成绩记录。</td>
+                    </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+    document.addEventListener('DOMContentLoaded', function () {
+        const chartEl = document.getElementById('matchResultChart');
+        if (!chartEl) return;
+        const chart = echarts.init(chartEl);
+        chart.setOption({
+            tooltip: { trigger: 'item' },
+            legend: { bottom: 0, left: 'center' },
+            series: [{
+                name: '比赛结果',
+                type: 'pie',
+                radius: ['42%', '68%'],
+                center: ['50%', '44%'],
+                data: {{ summary.result_pie|tojson }}
+            }]
+        });
+        window.addEventListener('resize', function () { chart.resize(); });
+    });
+</script>
+{% endblock %}

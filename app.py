@@ -361,6 +361,113 @@ INTENSITY_LABELS = {
     "极高": "极高",
 }
 
+MATCH_RESULTS = [
+    {
+        "id": 1,
+        "athlete_id": 1,
+        "match_date": "2026-05-15",
+        "match_name": "2026全国大学生锦标赛-男单",
+        "opponent": "刘强",
+        "result": "胜",
+        "score": "3:1",
+        "rank": "八强",
+        "key_points": "关键分 7:4，发球轮次连续得分。",
+        "tactic_review": "正手位拉球质量高，前三板衔接稳定。",
+        "improvement": "反手防守落点需要更主动。",
+    },
+    {
+        "id": 2,
+        "athlete_id": 1,
+        "match_date": "2026-05-17",
+        "match_name": "2026全国大学生锦标赛-男单",
+        "opponent": "何伟",
+        "result": "负",
+        "score": "1:3",
+        "rank": "八强",
+        "key_points": "第二局 9:9 后连续丢接发球分。",
+        "tactic_review": "对手反手快撕压制明显，台内球处理偏保守。",
+        "improvement": "补强反手位防守转换和接发抢攻线路。",
+    },
+    {
+        "id": 3,
+        "athlete_id": 2,
+        "match_date": "2026-06-02",
+        "match_name": "省青联赛第一轮",
+        "opponent": "周敏",
+        "result": "胜",
+        "score": "3:2",
+        "rank": "小组第2",
+        "key_points": "决胜局 6:8 反超，连续三板相持得分。",
+        "tactic_review": "左手线路变化有效，反手拧拉打开局面。",
+        "improvement": "领先后需要减少无谓抢攻失误。",
+    },
+    {
+        "id": 4,
+        "athlete_id": 3,
+        "match_date": "2026-06-15",
+        "match_name": "省青联赛第一轮",
+        "opponent": "李浩",
+        "result": "负",
+        "score": "2:3",
+        "rank": "小组第3",
+        "key_points": "决胜局 8:10 追回一分后被反拉得分。",
+        "tactic_review": "正手主动上手足够，但腰椎伤情影响侧身连续性。",
+        "improvement": "结合康复进度控制侧身进攻比例。",
+    },
+    {
+        "id": 5,
+        "athlete_id": 4,
+        "match_date": "2026-06-20",
+        "match_name": "校际交流赛",
+        "opponent": "林悦",
+        "result": "胜",
+        "score": "3:0",
+        "rank": "团体赛出场",
+        "key_points": "发抢轮次得分率高，第三局连续拿下 5 分。",
+        "tactic_review": "反手快拨衔接清晰，线路变化充分。",
+        "improvement": "膝伤恢复期不安排长回合对拉。",
+    },
+]
+
+ROLE_PERMISSION_MATRIX = [
+    {"module": "运动员档案", "admin": "新增 / 修改 / 删除 / 查询", "coach": "查询与训练关联查看"},
+    {"module": "训练数据录入", "admin": "导入 / 导出 / 编辑 / 删除", "coach": "新增训练与专项记录"},
+    {"module": "体能测试", "admin": "全量维护与异常处理", "coach": "录入、查询、统计"},
+    {"module": "伤病与康复", "admin": "严重伤病确认、归档、复训审批", "coach": "登记轻中度伤病与复诊记录"},
+    {"module": "比赛成绩", "admin": "维护成绩库与阶段报告", "coach": "查询、复盘、提交分析"},
+    {"module": "用户权限 / 系统配置", "admin": "账号、角色、字典、数据库账号", "coach": "不可访问"},
+]
+
+DATABASE_ACCOUNTS = [
+    {"username": "admin_app", "role": "管理员", "privilege": "ALL PRIVILEGES", "scope": "pingpang_db.*"},
+    {"username": "coach_app", "role": "教练员", "privilege": "SELECT, INSERT, UPDATE, DELETE", "scope": "业务数据表"},
+]
+
+SYSTEM_PARAMETERS = [
+    {"name": "系统名称", "value": "乒乓球运动员综合训练监控管理系统", "owner": "管理员"},
+    {"name": "数据库名", "value": "pingpang_db", "owner": "数据库设计组"},
+    {"name": "默认训练周期", "value": "按周 / 月 / 赛前阶段统计", "owner": "训练模块"},
+    {"name": "异常提示规则", "value": "伤病严重、体能低分、康复逾期触发预警", "owner": "测试与运维"},
+]
+
+DICTIONARY_GROUPS = [
+    {"name": "运动等级", "items": ["二级运动员", "一级运动员", "国家级", "健将级", "青年队"]},
+    {"name": "训练强度", "items": list(INTENSITY_LABELS.keys())},
+    {"name": "伤病程度", "items": INJURY_SEVERITY_OPTIONS},
+    {"name": "恢复状态", "items": INJURY_RECOVERY_STATUS_OPTIONS},
+    {"name": "比赛结果", "items": ["胜", "负", "平"]},
+]
+
+DATABASE_HEALTH_CHECKS = [
+    {"item": "数据表", "target": "不少于 6 张核心表", "status": "8 张表已覆盖", "class": "success"},
+    {"item": "约束", "target": "主键、外键、非空、唯一约束", "status": "SQL 脚本已配置", "class": "success"},
+    {"item": "索引", "target": "姓名、日期组合查询优化", "status": "按课程要求保留检查项", "class": "warning"},
+    {"item": "视图", "target": "运动员综合档案、月度训练汇总", "status": "需在最终 SQL 中验收", "class": "warning"},
+    {"item": "存储过程", "target": "批量导入月度训练数据、按等级筛选", "status": "需在最终 SQL 中验收", "class": "warning"},
+    {"item": "触发器", "target": "新增伤病后自动刷新运动员伤病状态", "status": "伤病模块已实现同等业务联动", "class": "success"},
+    {"item": "事务", "target": "训练数据 + 体能数据同步提交", "status": "体能模块已提供回滚逻辑", "class": "success"},
+]
+
 MODULE_FEATURES = {
     "训练计划管理": [
         {"title": "训练周期", "desc": "按周、月、赛前周期安排训练目标与重点。"},
@@ -867,14 +974,37 @@ def create_app():
     @rehab_bp.route("/", endpoint="list")
     @role_required("admin", "coach")
     def rehab_list():
-        return module_page("康复跟踪预警", "跟踪伤病康复进度，识别复训风险。")
+        rehab_records, active_condition_count = filter_rehab_records(request.args)
+        summary = build_rehab_summary(rehab_records)
+        return render_template(
+            "rehab/list.html",
+            rehab_records=rehab_records,
+            active_condition_count=active_condition_count,
+            total_count=len([item for item in INJURY_RECORDS if not item.get("is_deleted")]),
+            summary=summary,
+            risk_options=[
+                {"code": "high", "label": "高风险"},
+                {"code": "medium", "label": "观察"},
+                {"code": "low", "label": "可控"},
+            ],
+            recovery_status_options=INJURY_RECOVERY_STATUS_OPTIONS,
+        )
 
     matches_bp = Blueprint("matches", __name__, url_prefix="/matches")
 
     @matches_bp.route("/", endpoint="list")
     @role_required("admin", "coach")
     def matches_list():
-        return module_page("比赛成绩报告", "沉淀比赛成绩、技战术复盘和阶段报告。")
+        match_records, active_condition_count = filter_match_records(request.args)
+        summary = build_match_summary(match_records)
+        return render_template(
+            "matches/list.html",
+            match_records=match_records,
+            active_condition_count=active_condition_count,
+            total_count=len(MATCH_RESULTS),
+            summary=summary,
+            result_options=["胜", "负", "平"],
+        )
 
     auth_bp = Blueprint("auth", __name__, url_prefix="/auth")
 
@@ -885,14 +1015,27 @@ def create_app():
             {"username": username, **user}
             for username, user in USERS.items()
         ]
-        return render_template("auth/users.html", users=users)
+        summary = build_user_permission_summary(users)
+        return render_template(
+            "auth/users.html",
+            users=users,
+            summary=summary,
+            permission_matrix=ROLE_PERMISSION_MATRIX,
+            database_accounts=DATABASE_ACCOUNTS,
+        )
 
     settings_bp = Blueprint("settings", __name__, url_prefix="/settings")
 
     @settings_bp.route("/dictionary", endpoint="dictionary")
     @role_required("admin")
     def settings_dictionary():
-        return module_page("系统配置", "维护系统基础参数、数据字典和导入模板规则。")
+        return render_template(
+            "settings/dictionary.html",
+            parameters=SYSTEM_PARAMETERS,
+            dictionary_groups=DICTIONARY_GROUPS,
+            health_checks=DATABASE_HEALTH_CHECKS,
+            import_templates=build_import_templates(),
+        )
 
     app.register_blueprint(players_bp)
     app.register_blueprint(coaches_bp)
@@ -944,6 +1087,270 @@ def filter_players(args):
         return [player for player in PLAYERS if any(check(player) for check in predicates)], len(predicates)
 
     return [player for player in PLAYERS if all(check(player) for check in predicates)], len(predicates)
+
+
+def find_player(athlete_id):
+    return next((item for item in PLAYERS if item["id"] == athlete_id), None)
+
+
+def filter_rehab_records(args):
+    predicates = []
+    player_keyword = args.get("player_keyword", "").strip().lower()
+    risk_level = args.get("risk_level", "").strip()
+    recovery_status = args.get("recovery_status", "").strip()
+    overdue_only = args.get("overdue_only", "").strip()
+
+    records = [
+        enrich_rehab_record(item)
+        for item in INJURY_RECORDS
+        if not item.get("is_deleted") and item["recovery_status"] != "已恢复"
+    ]
+
+    if player_keyword:
+        predicates.append(
+            lambda record, value=player_keyword: value in record["player_name"].lower()
+            or value in record["student_no"].lower()
+            or value in record["injury_location"].lower()
+        )
+    if risk_level:
+        predicates.append(lambda record, value=risk_level: record["risk_code"] == value)
+    if recovery_status:
+        predicates.append(lambda record, value=recovery_status: record["recovery_status"] == value)
+    if overdue_only:
+        predicates.append(lambda record: record["is_overdue"])
+
+    records.sort(key=lambda item: (item["risk_weight"], item["expected_recovery_date"], item["id"]), reverse=True)
+    if not predicates:
+        return records, 0
+    return [record for record in records if all(check(record) for check in predicates)], len(predicates)
+
+
+def enrich_rehab_record(record):
+    player = find_player(record["athlete_id"])
+    followup = latest_followup(record["id"])
+    pain_score = followup["pain_score"] if followup else estimate_pain_score(record)
+    progress = calculate_rehab_progress(record)
+    is_overdue = bool(
+        record.get("expected_recovery_date")
+        and record["expected_recovery_date"] < datetime.now().strftime("%Y-%m-%d")
+    )
+    risk = evaluate_rehab_risk(record, pain_score, progress, is_overdue)
+    base = enrich_injury_record(record)
+    base.update(
+        {
+            "player_name": player["name"] if player else "未知运动员",
+            "student_no": player["student_no"] if player else "-",
+            "pain_score": pain_score,
+            "progress": progress,
+            "risk_code": risk["code"],
+            "risk_label": risk["label"],
+            "risk_class": risk["class"],
+            "risk_weight": risk["weight"],
+            "latest_followup_date": followup["followup_date"] if followup else "-",
+            "training_limit": followup["training_limit"] if followup else build_training_alert_for_record(record),
+            "reviewer": followup["reviewer"] if followup else "待复诊",
+            "return_training_advice": build_return_training_advice(record, pain_score, progress, risk["code"]),
+        }
+    )
+    return base
+
+
+def estimate_pain_score(record):
+    if record["severity"] == "严重":
+        return 6
+    if record["severity"] == "中度":
+        return 4
+    return 2
+
+
+def calculate_rehab_progress(record):
+    injury_date = parse_date_for_calc(record["injury_date"])
+    expected_date = parse_date_for_calc(record.get("expected_recovery_date", ""))
+    if not injury_date or not expected_date:
+        return 35
+    total_days = max((expected_date - injury_date).days, 1)
+    elapsed_days = max((datetime.now() - injury_date).days, 0)
+    return max(5, min(100, round(elapsed_days / total_days * 100)))
+
+
+def evaluate_rehab_risk(record, pain_score, progress, is_overdue):
+    if record["severity"] == "严重" and record["recovery_status"] == "治疗中":
+        return {"code": "high", "label": "高风险", "class": "danger", "weight": 3}
+    if is_overdue or pain_score >= 6 or progress < 35:
+        return {"code": "high", "label": "高风险", "class": "danger", "weight": 3}
+    if record["severity"] == "严重" or pain_score >= 3 or record["recovery_status"] == "康复中":
+        return {"code": "medium", "label": "观察", "class": "warning", "weight": 2}
+    return {"code": "low", "label": "可控", "class": "success", "weight": 1}
+
+
+def build_return_training_advice(record, pain_score, progress, risk_code):
+    if risk_code == "high":
+        return "暂停对抗和高强度专项训练，先完成复诊评估。"
+    if record["recovery_status"] == "康复中" and pain_score <= 3 and progress >= 70:
+        return "可安排低到中等强度复训，逐步恢复步法和多球训练。"
+    if record["recovery_status"] == "康复中":
+        return "维持康复训练，控制单次负荷并保留疼痛反馈。"
+    return "以治疗和基础活动度恢复为主，暂不进入正常训练。"
+
+
+def build_rehab_summary(records):
+    risk_counts = {"high": 0, "medium": 0, "low": 0}
+    progress_total = 0
+    pain_total = 0
+    ready_count = 0
+    overdue_count = 0
+    for record in records:
+        risk_counts[record["risk_code"]] += 1
+        progress_total += record["progress"]
+        pain_total += record["pain_score"]
+        if record["risk_code"] == "low" and record["progress"] >= 70:
+            ready_count += 1
+        if record["is_overdue"]:
+            overdue_count += 1
+    total = len(records)
+    return {
+        "record_count": total,
+        "high_risk_count": risk_counts["high"],
+        "ready_count": ready_count,
+        "overdue_count": overdue_count,
+        "average_progress": round(progress_total / total, 1) if total else 0,
+        "average_pain": round(pain_total / total, 1) if total else 0,
+        "risk_pie": [
+            {"name": "高风险", "value": risk_counts["high"]},
+            {"name": "观察", "value": risk_counts["medium"]},
+            {"name": "可控", "value": risk_counts["low"]},
+        ],
+    }
+
+
+def filter_match_records(args):
+    predicates = []
+    player_keyword = args.get("player_keyword", "").strip().lower()
+    result = args.get("result", "").strip()
+    date_from = args.get("date_from", "").strip()
+    date_to = args.get("date_to", "").strip()
+    opponent_keyword = args.get("opponent_keyword", "").strip().lower()
+
+    if player_keyword:
+        predicates.append(
+            lambda record, value=player_keyword: value in record["player_name"].lower()
+            or value in record["student_no"].lower()
+        )
+    if result:
+        predicates.append(lambda record, value=result: record["result"] == value)
+    if date_from:
+        predicates.append(lambda record, value=date_from: record["match_date"] >= value)
+    if date_to:
+        predicates.append(lambda record, value=date_to: record["match_date"] <= value)
+    if opponent_keyword:
+        predicates.append(lambda record, value=opponent_keyword: value in record["opponent"].lower())
+
+    records = [enrich_match_record(item) for item in MATCH_RESULTS]
+    records.sort(key=lambda item: (item["match_date"], item["id"]), reverse=True)
+    if not predicates:
+        return records, 0
+    return [record for record in records if all(check(record) for check in predicates)], len(predicates)
+
+
+def enrich_match_record(record):
+    player = find_player(record["athlete_id"])
+    base = dict(record)
+    base.update(
+        {
+            "player_name": player["name"] if player else "未知运动员",
+            "student_no": player["student_no"] if player else "-",
+            "level": (player.get("skill_level") or player.get("level")) if player else "-",
+            "result_class": match_result_class(record["result"]),
+            "score_diff": calculate_match_score_diff(record["score"]),
+        }
+    )
+    return base
+
+
+def match_result_class(result):
+    return {
+        "胜": "success",
+        "负": "danger",
+        "平": "secondary",
+    }.get(result, "secondary")
+
+
+def calculate_match_score_diff(score):
+    parts = score.split(":")
+    if len(parts) != 2:
+        return 0
+    try:
+        return int(parts[0]) - int(parts[1])
+    except ValueError:
+        return 0
+
+
+def build_match_summary(records):
+    result_counts = {"胜": 0, "负": 0, "平": 0}
+    month_map = {}
+    player_map = {}
+    for record in records:
+        result_counts[record["result"]] += 1
+        month_key = record["match_date"][:7]
+        month_map[month_key] = month_map.get(month_key, 0) + 1
+        player_stats = player_map.setdefault(record["player_name"], {"matches": 0, "wins": 0})
+        player_stats["matches"] += 1
+        if record["result"] == "胜":
+            player_stats["wins"] += 1
+
+    total = len(records)
+    player_rates = sorted(
+        (
+            {
+                "name": name,
+                "matches": stats["matches"],
+                "win_rate": round(stats["wins"] / stats["matches"] * 100, 1) if stats["matches"] else 0,
+            }
+            for name, stats in player_map.items()
+        ),
+        key=lambda item: (item["win_rate"], item["matches"]),
+        reverse=True,
+    )
+    month_labels = sorted(month_map.keys())
+    return {
+        "record_count": total,
+        "win_count": result_counts["胜"],
+        "loss_count": result_counts["负"],
+        "draw_count": result_counts["平"],
+        "win_rate": round(result_counts["胜"] / total * 100, 1) if total else 0,
+        "result_pie": [{"name": key, "value": value} for key, value in result_counts.items()],
+        "month_labels": month_labels,
+        "month_counts": [month_map[key] for key in month_labels],
+        "player_rates": player_rates[:5],
+    }
+
+
+def build_user_permission_summary(users):
+    admin_count = sum(1 for user in users if user["role"] == "admin")
+    coach_count = sum(1 for user in users if user["role"] == "coach")
+    return {
+        "total_count": len(users),
+        "admin_count": admin_count,
+        "coach_count": coach_count,
+        "database_account_count": len(DATABASE_ACCOUNTS),
+    }
+
+
+def build_import_templates():
+    return [
+        {"name": "训练计划导入模板", "fields": ["运动员", "教练", "训练日期", "内容", "强度", "时长", "地点"]},
+        {"name": "体能测试导入模板", "fields": ["运动员", "测试日期", "测试教练", "上肢力量", "下肢力量", "柔韧性", "耐力", "速度"]},
+        {"name": "比赛成绩导入模板", "fields": ["运动员", "比赛日期", "比赛名称", "对手", "结果", "比分", "复盘备注"]},
+    ]
+
+
+def parse_date_for_calc(value):
+    if not value:
+        return None
+    try:
+        return datetime.strptime(value[:10], "%Y-%m-%d")
+    except ValueError:
+        return None
 
 
 class ValidationError(Exception):

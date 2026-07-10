@@ -1,0 +1,235 @@
+{% extends "base.html" %}
+
+{% block title %}康复跟踪 - 乒乓球运动员综合训练监控管理系统{% endblock %}
+
+{% block extra_css %}
+<style>
+    .rehab-stat {
+        border-left: 4px solid var(--tt-primary);
+    }
+
+    .progress {
+        height: .65rem;
+    }
+
+    .chart-box-sm {
+        width: 100%;
+        height: 280px;
+    }
+</style>
+{% endblock %}
+
+{% block content %}
+<div class="d-flex flex-column flex-md-row align-items-md-center justify-content-between gap-3 mb-4">
+    <div>
+        <h1 class="page-title h3 mb-1">康复跟踪预警</h1>
+        <p class="text-secondary mb-0">围绕伤病记录、复诊数据和训练限制形成复训风险台账。</p>
+    </div>
+    <a href="{{ url_for('injuries.list') }}" class="btn btn-outline-secondary">进入伤病记录</a>
+</div>
+
+<div class="row g-3 mb-4">
+    <div class="col-6 col-xl-3">
+        <div class="card shadow-sm rehab-stat h-100">
+            <div class="card-body">
+                <div class="text-secondary small">康复跟踪记录</div>
+                <div class="fs-3 fw-bold">{{ summary.record_count }}</div>
+            </div>
+        </div>
+    </div>
+    <div class="col-6 col-xl-3">
+        <div class="card shadow-sm rehab-stat h-100">
+            <div class="card-body">
+                <div class="text-secondary small">高风险</div>
+                <div class="fs-3 fw-bold text-danger">{{ summary.high_risk_count }}</div>
+            </div>
+        </div>
+    </div>
+    <div class="col-6 col-xl-3">
+        <div class="card shadow-sm rehab-stat h-100">
+            <div class="card-body">
+                <div class="text-secondary small">平均康复进度</div>
+                <div class="fs-3 fw-bold">{{ summary.average_progress }}%</div>
+            </div>
+        </div>
+    </div>
+    <div class="col-6 col-xl-3">
+        <div class="card shadow-sm rehab-stat h-100">
+            <div class="card-body">
+                <div class="text-secondary small">逾期未恢复</div>
+                <div class="fs-3 fw-bold text-warning">{{ summary.overdue_count }}</div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<div class="card shadow-sm mb-4">
+    <div class="card-header bg-white border-0 pt-4 px-4">
+        <h2 class="h5 mb-1">康复条件筛选</h2>
+        <p class="text-secondary small mb-0">支持按运动员、伤病部位、风险等级和恢复状态组合查询。</p>
+    </div>
+    <div class="card-body">
+        <form class="row g-3 align-items-end" method="get" action="{{ url_for('rehab.list') }}">
+            <div class="col-12 col-md-3">
+                <label for="player_keyword" class="form-label">关键词</label>
+                <input type="text" class="form-control" id="player_keyword" name="player_keyword"
+                       value="{{ request.args.get('player_keyword', '') }}" placeholder="姓名、学号或部位">
+            </div>
+            <div class="col-6 col-md-2">
+                <label for="risk_level" class="form-label">风险等级</label>
+                <select class="form-select" id="risk_level" name="risk_level">
+                    <option value="">不限</option>
+                    {% for option in risk_options %}
+                        <option value="{{ option.code }}" {% if request.args.get('risk_level') == option.code %}selected{% endif %}>{{ option.label }}</option>
+                    {% endfor %}
+                </select>
+            </div>
+            <div class="col-6 col-md-2">
+                <label for="recovery_status" class="form-label">恢复状态</label>
+                <select class="form-select" id="recovery_status" name="recovery_status">
+                    <option value="">不限</option>
+                    {% for status in recovery_status_options %}
+                        <option value="{{ status }}" {% if request.args.get('recovery_status') == status %}selected{% endif %}>{{ status }}</option>
+                    {% endfor %}
+                </select>
+            </div>
+            <div class="col-12 col-md-2">
+                <div class="form-check">
+                    <input class="form-check-input" type="checkbox" id="overdue_only" name="overdue_only" value="1"
+                           {% if request.args.get('overdue_only') %}checked{% endif %}>
+                    <label class="form-check-label" for="overdue_only">只看逾期</label>
+                </div>
+            </div>
+            <div class="col-6 col-md-1 d-grid">
+                <button type="submit" class="btn btn-primary">查询</button>
+            </div>
+            <div class="col-6 col-md-1 d-grid">
+                <a href="{{ url_for('rehab.list') }}" class="btn btn-outline-secondary">重置</a>
+            </div>
+        </form>
+        <div class="mt-3 text-secondary small">
+            当前命中 {{ rehab_records|length }} 条记录，共 {{ total_count }} 条伤病记录，启用 {{ active_condition_count }} 个查询条件。
+        </div>
+    </div>
+</div>
+
+<div class="row g-4 mb-4">
+    <div class="col-12 col-xl-4">
+        <div class="card shadow-sm h-100">
+            <div class="card-header bg-white border-0 pt-4 px-4">
+                <h2 class="h5 mb-1">复训风险分布</h2>
+            </div>
+            <div class="card-body">
+                <div id="rehabRiskChart" class="chart-box-sm"></div>
+            </div>
+        </div>
+    </div>
+    <div class="col-12 col-xl-8">
+        <div class="card shadow-sm h-100">
+            <div class="card-header bg-white border-0 pt-4 px-4">
+                <h2 class="h5 mb-1">复训建议</h2>
+            </div>
+            <div class="card-body">
+                <div class="row g-3">
+                    {% for record in rehab_records[:4] %}
+                    <div class="col-12 col-lg-6">
+                        <div class="border rounded-3 p-3 h-100 bg-light">
+                            <div class="d-flex justify-content-between gap-2">
+                                <div class="fw-semibold">{{ record.player_name }} · {{ record.injury_location }}</div>
+                                <span class="badge text-bg-{{ record.risk_class }}">{{ record.risk_label }}</span>
+                            </div>
+                            <div class="small text-secondary mt-2">疼痛评分 {{ record.pain_score }}/10 · 康复进度 {{ record.progress }}%</div>
+                            <div class="small mt-2">{{ record.return_training_advice }}</div>
+                        </div>
+                    </div>
+                    {% else %}
+                    <div class="col-12 text-secondary">暂无符合条件的康复记录。</div>
+                    {% endfor %}
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<div class="card shadow-sm">
+    <div class="card-header bg-white border-0 pt-4 px-4">
+        <h2 class="h5 mb-1">康复跟踪明细</h2>
+        <p class="text-secondary small mb-0">整合伤病档案、复诊记录、疼痛评分和训练限制。</p>
+    </div>
+    <div class="card-body">
+        <div class="table-responsive">
+            <table class="table table-hover align-middle">
+                <thead class="table-light">
+                    <tr>
+                        <th>运动员</th>
+                        <th>伤病 / 状态</th>
+                        <th>康复进度</th>
+                        <th>疼痛</th>
+                        <th>最近复诊</th>
+                        <th>训练限制</th>
+                        <th>预计恢复</th>
+                        <th class="text-end">风险</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for record in rehab_records %}
+                    <tr>
+                        <td>
+                            <div class="fw-semibold">{{ record.player_name }}</div>
+                            <div class="text-secondary small">{{ record.student_no }} · {{ record.level }}</div>
+                        </td>
+                        <td>
+                            <div>{{ record.injury_location }} / {{ record.injury_type }}</div>
+                            <div class="small text-secondary">{{ record.severity }} · {{ record.recovery_status }}</div>
+                        </td>
+                        <td style="min-width: 160px;">
+                            <div class="d-flex justify-content-between small mb-1">
+                                <span>{{ record.progress }}%</span>
+                                {% if record.is_overdue %}<span class="text-warning">逾期</span>{% endif %}
+                            </div>
+                            <div class="progress">
+                                <div class="progress-bar" role="progressbar" style="width: {{ record.progress }}%"></div>
+                            </div>
+                        </td>
+                        <td>{{ record.pain_score }}/10</td>
+                        <td>
+                            <div>{{ record.latest_followup_date }}</div>
+                            <div class="small text-secondary">{{ record.reviewer }}</div>
+                        </td>
+                        <td class="small">{{ record.training_limit }}</td>
+                        <td>{{ record.expected_recovery_date or "-" }}</td>
+                        <td class="text-end"><span class="badge text-bg-{{ record.risk_class }}">{{ record.risk_label }}</span></td>
+                    </tr>
+                    {% else %}
+                    <tr>
+                        <td colspan="8" class="text-center text-secondary py-5">暂无康复跟踪记录。</td>
+                    </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+    document.addEventListener('DOMContentLoaded', function () {
+        const chartEl = document.getElementById('rehabRiskChart');
+        if (!chartEl) return;
+        const chart = echarts.init(chartEl);
+        chart.setOption({
+            tooltip: { trigger: 'item' },
+            legend: { bottom: 0, left: 'center' },
+            series: [{
+                name: '复训风险',
+                type: 'pie',
+                radius: ['42%', '68%'],
+                center: ['50%', '44%'],
+                data: {{ summary.risk_pie|tojson }}
+            }]
+        });
+        window.addEventListener('resize', function () { chart.resize(); });
+    });
+</script>
+{% endblock %}
