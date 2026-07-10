@@ -71,6 +71,32 @@
         </div>
     </div>
 </div>
+
+<div class="row g-4 mt-1">
+    <div class="col-12 col-xl-7">
+        <div class="card shadow-sm h-100">
+            <div class="card-header bg-white border-0 pt-4 px-4">
+                <h2 class="h5 mb-1">训练强度结构</h2>
+                <p class="text-secondary small mb-0">按月拆分低、中、高、极高强度训练量，辅助判断负荷分配是否合理。</p>
+            </div>
+            <div class="card-body">
+                <div id="trainingLoadStackChart" class="chart-box"></div>
+            </div>
+        </div>
+    </div>
+
+    <div class="col-12 col-xl-5">
+        <div class="card shadow-sm h-100">
+            <div class="card-header bg-white border-0 pt-4 px-4">
+                <h2 class="h5 mb-1">体能能力雷达</h2>
+                <p class="text-secondary small mb-0">展示队伍力量、柔韧、耐力、速度等关键体能指标结构。</p>
+            </div>
+            <div class="card-body">
+                <div id="fitnessRadarChart" class="chart-box"></div>
+            </div>
+        </div>
+    </div>
+</div>
 {% endblock %}
 
 {% block scripts %}
@@ -78,6 +104,8 @@
     document.addEventListener('DOMContentLoaded', function () {
         const injuryChart = echarts.init(document.getElementById('injuryPieChart'));
         const trainingChart = echarts.init(document.getElementById('trainingLineChart'));
+        const trainingLoadChart = echarts.init(document.getElementById('trainingLoadStackChart'));
+        const fitnessRadarChart = echarts.init(document.getElementById('fitnessRadarChart'));
 
         injuryChart.setOption({
             tooltip: {
@@ -140,9 +168,88 @@
             }]
         });
 
+        trainingLoadChart.setOption({
+            color: ['#69a7d7', '#1769aa', '#f0ad4e', '#dc3545'],
+            tooltip: {
+                trigger: 'axis',
+                axisPointer: { type: 'shadow' },
+                formatter: function (params) {
+                    const total = params.reduce(function (sum, item) { return sum + item.value; }, 0);
+                    const lines = params.map(function (item) {
+                        return item.marker + item.seriesName + '：' + item.value + 'h';
+                    });
+                    return params[0].axisValue + '<br/>' + lines.join('<br/>') + '<br/>合计：' + total + 'h';
+                }
+            },
+            legend: {
+                bottom: 0,
+                left: 'center'
+            },
+            grid: {
+                left: 44,
+                right: 24,
+                top: 32,
+                bottom: 58
+            },
+            xAxis: {
+                type: 'category',
+                data: ['1月', '2月', '3月', '4月', '5月', '6月']
+            },
+            yAxis: {
+                type: 'value',
+                name: '小时'
+            },
+            series: [
+                { name: '低强度', type: 'bar', stack: 'total', data: [42, 38, 44, 46, 40, 48] },
+                { name: '中强度', type: 'bar', stack: 'total', data: [78, 88, 92, 96, 90, 98] },
+                { name: '高强度', type: 'bar', stack: 'total', data: [40, 54, 62, 72, 74, 82] },
+                { name: '极高强度', type: 'bar', stack: 'total', data: [8, 12, 16, 24, 22, 24] }
+            ]
+        });
+
+        fitnessRadarChart.setOption({
+            color: ['#1769aa', '#20a67a'],
+            tooltip: {
+                trigger: 'item'
+            },
+            legend: {
+                bottom: 0,
+                left: 'center'
+            },
+            radar: {
+                radius: '62%',
+                center: ['50%', '45%'],
+                indicator: [
+                    { name: '上肢力量', max: 100 },
+                    { name: '下肢力量', max: 100 },
+                    { name: '柔韧性', max: 100 },
+                    { name: '耐力', max: 100 },
+                    { name: '速度', max: 100 }
+                ],
+                splitNumber: 4
+            },
+            series: [{
+                name: '体能结构',
+                type: 'radar',
+                areaStyle: { opacity: 0.12 },
+                data: [
+                    {
+                        value: [78, 79, 71, 79, 76],
+                        name: '当前均值'
+                    },
+                    {
+                        value: [85, 86, 82, 86, 88],
+                        name: '目标标准'
+                    }
+                ]
+            }]
+        });
+
         window.addEventListener('resize', function () {
             injuryChart.resize();
             trainingChart.resize();
+            trainingLoadChart.resize();
+            fitnessRadarChart.resize();
         });
     });
 </script>
