@@ -2,6 +2,8 @@
 venv/
 env/
 __pycache__/
+.pytest_cache/
+*.log
 .agents/
 .codex/
 .codex_tmp/

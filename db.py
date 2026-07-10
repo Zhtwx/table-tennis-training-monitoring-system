@@ -10,12 +10,13 @@ load_dotenv()
 
 def get_mysql_connection():
     return pymysql.connect(
-        host=os.getenv("DB_HOST", "localhost"),
+        host=os.getenv("DB_HOST", "127.0.0.1"),
         port=int(os.getenv("DB_PORT", 3306)),
         user=os.getenv("DB_USER", "root"),
         password=os.getenv("DB_PASSWORD", ""),
         database=os.getenv("DB_NAME", "pingpang_db"),
         charset="utf8mb4",
         cursorclass=DictCursor,
+        connect_timeout=int(os.getenv("DB_CONNECT_TIMEOUT", 1)),
         autocommit=False,
     )

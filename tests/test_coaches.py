@@ -9,6 +9,26 @@ def login(client, username="admin", password="admin123"):
     )
 
 
+def test_coach_list_falls_back_to_sample_data_when_database_unavailable(monkeypatch):
+    import coaches.routes as coach_routes
+    from pymysql.err import OperationalError
+
+    def unavailable(*args, **kwargs):
+        raise OperationalError(2003, "Can't connect to MySQL server on 'localhost'")
+
+    monkeypatch.setattr(coach_routes, "fetch_all", unavailable)
+
+    client = app.test_client()
+    login(client)
+
+    response = client.get("/coaches/")
+    body = response.get_data(as_text=True)
+
+    assert response.status_code == 200
+    assert "\u5f20\u6559\u7ec3" in body
+    assert "\u6559\u7ec3\u5458\u6570\u636e\u6682\u65f6\u4e0d\u53ef\u7528" not in body
+
+
 def test_coach_list_page_renders(monkeypatch):
     import coaches.routes as coach_routes
 
