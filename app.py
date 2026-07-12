@@ -1528,38 +1528,13 @@ def create_app():
             flash("请先选择 Excel 文件。", "warning")
             return redirect(url_for("training.batch_import"))
 
-        imported_count = 0
-        error_rows = []
-        try:
-            wb = openpyxl.load_workbook(file)
-            ws = wb.active
-            for idx, row in enumerate(ws.iter_rows(min_row=2, values_only=True), start=2):
-                athlete_value, training_date, footwork, stroke, minutes, intensity, note = (list(row) + [None] * 7)[:7]
-                if not any([athlete_value, training_date, footwork, stroke, minutes, intensity, note]):
-                    continue
-                try:
-                    form = {
-                        "athlete_id": resolve_athlete_id(athlete_value),
-                        "training_date": normalize_excel_date(training_date),
-                        "footwork_type": resolve_option_code(footwork, FOOTWORK_TYPE_LABELS),
-                        "stroke_technique": resolve_option_code(stroke, STROKE_TECHNIQUE_LABELS),
-                        "multi_ball_minutes": "" if minutes is None else str(minutes),
-                        "intensity": resolve_option_code(intensity, TECHNICAL_INTENSITY_LABELS),
-                        "training_note": "" if note is None else str(note),
-                    }
-                    save_technical_training_record(form, current_user()["username"])
-                    imported_count += 1
-                except ValidationError as exc:
-                    error_rows.append(f"第 {idx} 行：{exc}")
-
-            if error_rows:
-                flash(f"成功导入 {imported_count} 条，跳过 {len(error_rows)} 条异常数据。", "warning")
-                for err in error_rows[:5]:
-                    flash(err, "warning")
-            else:
-                flash(f"成功导入 {imported_count} 条专项技术记录。", "success")
-        except Exception as exc:
-            flash(f"Excel 解析失败：{exc}", "danger")
+        imported_count, error_rows = import_technical_training_excel(file, current_user()["username"])
+        if error_rows:
+            flash(f"成功导入 {imported_count} 条，跳过 {len(error_rows)} 条异常数据。", "warning")
+            for err in error_rows[:5]:
+                flash(err, "warning")
+        else:
+            flash(f"成功导入 {imported_count} 条专项技术记录。", "success")
 
         return redirect(url_for("training.batch_import"))
 
@@ -1898,7 +1873,7 @@ def create_app():
                     flash("请先选择专项技术 Excel 文件。", "warning")
                     return redirect(url_for("stats.import_export"))
 
-                imported_count, error_rows = import_stats_skill_excel(file, current_user()["username"])
+                imported_count, error_rows = import_technical_training_excel(file, current_user()["username"])
                 if error_rows:
                     flash(f"成功导入 {imported_count} 条专项技术记录，跳过 {len(error_rows)} 条异常数据。", "warning")
                     for err in error_rows[:5]:
@@ -2602,7 +2577,7 @@ def calculate_technical_record_score(record):
     return round(min(100, intensity_score + minutes_bonus), 1)
 
 
-def import_stats_skill_excel(file, operator):
+def import_technical_training_excel(file, operator):
     imported_count = 0
     error_rows = []
     try:
@@ -2635,6 +2610,10 @@ def import_stats_skill_excel(file, operator):
     return imported_count, error_rows
 
 
+def import_stats_skill_excel(file, operator):
+    return import_technical_training_excel(file, operator)
+
+
 def build_stats_import_form(
     athlete_value,
     training_date,
@@ -2663,7 +2642,7 @@ def build_stats_import_form(
     note_parts.extend(part for part in [footwork_note, score_note] if part)
 
     return {
-        "athlete_id": resolve_athlete_id(athlete_value),
+        "athlete_id": resolve_athlete_id(athlete_value, create_if_missing=True),
         "training_date": normalize_excel_date(training_date),
         "footwork_type": footwork_code,
         "stroke_technique": stroke_code,
@@ -2780,7 +2759,7 @@ def write_injury_sheet(ws, records):
         row_idx += 1
 
 
-def resolve_athlete_id(value):
+def resolve_athlete_id(value, create_if_missing=False):
     if value is None:
         return ""
     text = str(value).strip()
@@ -2810,7 +2789,44 @@ def resolve_athlete_id(value):
     )
     if player:
         return str(player["id"])
+    if create_if_missing and should_create_import_player(text, numeric_text):
+        return str(create_import_player_archive(text)["id"])
     raise ValidationError(f"找不到运动员：{text}")
+
+
+def should_create_import_player(text, numeric_text):
+    return bool(text) and not numeric_text.isdigit() and len(text) <= 50
+
+
+def create_import_player_archive(name):
+    player_id = next_id(PLAYERS)
+    player = {
+        "id": player_id,
+        "student_no": next_import_student_no(player_id),
+        "name": name,
+        "gender": "未录入",
+        "age": 18,
+        "level": PLAYER_LEVEL_LABELS["youth"],
+        "skill_level": PLAYER_LEVEL_LABELS["youth"],
+        "level_code": "youth",
+        "play_style": "Excel导入待补充",
+        "grip": "",
+        "contact_phone": "",
+        "injury_status": PLAYER_INJURY_STATUS_LABELS["healthy"],
+        "injury_status_code": "healthy",
+        "source": "excel_import",
+    }
+    PLAYERS.append(player)
+    return player
+
+
+def next_import_student_no(player_id):
+    candidate_number = player_id
+    while True:
+        student_no = f"IMP{candidate_number:04d}"
+        if not any(item["student_no"] == student_no for item in PLAYERS):
+            return student_no
+        candidate_number += 1
 
 
 def resolve_option_code(value, options):

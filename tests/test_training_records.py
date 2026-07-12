@@ -151,3 +151,45 @@ def test_skill_excel_import_accepts_player_name_and_student_no():
     finally:
         records = get_training_records()
         records[:] = original_records
+
+
+def test_skill_excel_import_creates_player_archive_for_new_names():
+    original_players = deepcopy(app_module.PLAYERS)
+    original_records = deepcopy(get_training_records())
+    try:
+        client = app.test_client()
+        login(client)
+
+        workbook = openpyxl.Workbook()
+        sheet = workbook.active
+        sheet.append(["运动员名称", "训练日期", "步法类型", "击球技术", "多球时长", "训练强度", "备注"])
+        sheet.append(["小明", "2026-06-06", "单步", "正手弧圈", 104, "高强度", "new player import"])
+        payload = io.BytesIO()
+        workbook.save(payload)
+        payload.seek(0)
+
+        response = client.post(
+            "/training/records/import-excel",
+            data=csrf_data(
+                client,
+                {"training_excel": (payload, "skill_import_new_player.xlsx")},
+            ),
+            content_type="multipart/form-data",
+            follow_redirects=True,
+        )
+
+        body = response.get_data(as_text=True)
+        records = get_training_records()
+        created_player = next((player for player in app_module.PLAYERS if player["name"] == "小明"), None)
+
+        assert response.status_code == 200
+        assert "成功导入 1 条专项技术记录" in body
+        assert created_player is not None
+        assert created_player["student_no"].startswith("IMP")
+        assert len(records) == len(original_records) + 1
+        assert records[-1]["athlete_id"] == created_player["id"]
+        assert records[-1]["athlete_name"] == "小明"
+    finally:
+        app_module.PLAYERS[:] = original_players
+        records = get_training_records()
+        records[:] = original_records
