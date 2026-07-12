@@ -197,7 +197,18 @@
     <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/js/bootstrap.bundle.min.js"></script>
     <script src="https://cdn.jsdelivr.net/npm/echarts@5.5.1/dist/echarts.min.js"></script>
     <script>
+        window.csrfToken = "{{ csrf_token() }}";
         document.addEventListener('DOMContentLoaded', function () {
+            document.querySelectorAll('form').forEach(function (form) {
+                const method = (form.getAttribute('method') || 'get').toLowerCase();
+                if (method !== 'post' || form.querySelector('input[name="csrf_token"]')) return;
+                const input = document.createElement('input');
+                input.type = 'hidden';
+                input.name = 'csrf_token';
+                input.value = window.csrfToken;
+                form.appendChild(input);
+            });
+
             const root = document.documentElement;
             const resizer = document.getElementById('sidebarResizer');
             if (!resizer || window.innerWidth < 992) return;

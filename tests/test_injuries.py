@@ -3,6 +3,7 @@ from copy import deepcopy
 import pytest
 
 from app import INJURY_FOLLOWUPS, INJURY_RECORDS, PLAYERS, app
+from tests.helpers import csrf_data
 
 
 @pytest.fixture(autouse=True)
@@ -68,7 +69,7 @@ def test_invalid_record_id_is_rejected(admin_client):
 
     response = admin_client.post(
         "/injuries/",
-        data=injury_payload(record_id="abc"),
+        data=csrf_data(admin_client, injury_payload(record_id="abc")),
         follow_redirects=True,
     )
 
@@ -81,7 +82,10 @@ def test_admin_can_register_serious_injury_and_refresh_status(admin_client):
 
     admin_client.post(
         "/injuries/",
-        data=injury_payload(severity="严重", recovery_status="治疗中"),
+        data=csrf_data(
+            admin_client,
+            injury_payload(severity="严重", recovery_status="治疗中"),
+        ),
         follow_redirects=True,
     )
 
@@ -94,12 +98,12 @@ def test_coach_cannot_register_serious_or_recovered_record(coach_client):
 
     serious_response = coach_client.post(
         "/injuries/",
-        data=injury_payload(severity="严重"),
+        data=csrf_data(coach_client, injury_payload(severity="严重")),
         follow_redirects=True,
     )
     recovered_response = coach_client.post(
         "/injuries/",
-        data=injury_payload(recovery_status="已恢复"),
+        data=csrf_data(coach_client, injury_payload(recovery_status="已恢复")),
         follow_redirects=True,
     )
 
@@ -111,18 +115,24 @@ def test_coach_cannot_register_serious_or_recovered_record(coach_client):
 def test_archive_record_excludes_it_from_status(admin_client):
     admin_client.post(
         "/injuries/",
-        data=injury_payload(severity="严重", recovery_status="治疗中"),
+        data=csrf_data(
+            admin_client,
+            injury_payload(severity="严重", recovery_status="治疗中"),
+        ),
         follow_redirects=True,
     )
     record_id = INJURY_RECORDS[-1]["id"]
 
     admin_client.post(
         "/injuries/",
-        data={
-            "action": "archive",
-            "archive_record_id": str(record_id),
-            "delete_reason": "测试作废",
-        },
+        data=csrf_data(
+            admin_client,
+            {
+                "action": "archive",
+                "archive_record_id": str(record_id),
+                "delete_reason": "测试作废",
+            },
+        ),
         follow_redirects=True,
     )
 
@@ -133,15 +143,18 @@ def test_archive_record_excludes_it_from_status(admin_client):
 def test_followup_validation_and_history_render(admin_client):
     response = admin_client.post(
         "/injuries/",
-        data={
-            "action": "followup",
-            "followup_record_id": "2",
-            "followup_date": "2026-07-03",
-            "pain_score": "2",
-            "training_limit": "降低反手训练量",
-            "advice": "继续观察",
-            "reviewer": "刘指导",
-        },
+        data=csrf_data(
+            admin_client,
+            {
+                "action": "followup",
+                "followup_record_id": "2",
+                "followup_date": "2026-07-03",
+                "pain_score": "2",
+                "training_limit": "降低反手训练量",
+                "advice": "继续观察",
+                "reviewer": "刘指导",
+            },
+        ),
         follow_redirects=True,
     )
     history = admin_client.get("/injuries/player/2/history")

@@ -1,10 +1,11 @@
 import io
+import os
+import secrets
 import openpyxl
 from flask import send_file
 from openpyxl.styles import Font, Alignment
 from copy import deepcopy
 from datetime import datetime, timedelta
-from functools import wraps
 
 from flask import (
     Blueprint,
@@ -17,23 +18,14 @@ from flask import (
     url_for,
 )
 
-
-USERS = {
-    "admin": {
-        "password": "admin123",
-        "name": "系统管理员",
-        "role": "admin",
-        "role_name": "管理员",
-        "department": "训练中心",
-    },
-    "coach": {
-        "password": "user123",
-        "name": "教练用户",
-        "role": "coach",
-        "role_name": "普通用户",
-        "department": "一队教练组",
-    },
-}
+from auth_utils import (
+    USERS,
+    can_delete_training_plan,
+    current_user,
+    is_safe_redirect_url,
+    role_required,
+)
+from security import AUDIT_LOGS, csrf_token, record_audit_log, validate_csrf_token
 
 NAV_ITEMS = [
     {"label": "综合看板", "endpoint": "index", "roles": {"admin", "coach"}},
@@ -472,6 +464,560 @@ MATCH_RESULTS = [
     },
 ]
 
+DEMO_PLAYERS = [
+    {
+        "id": 5,
+        "student_no": "2026005",
+        "name": "孙泽宇",
+        "gender": "男",
+        "age": 17,
+        "level": "青年队",
+        "skill_level": "青年队",
+        "level_code": "youth",
+        "play_style": "右手横板快攻弧圈",
+        "injury_status": "健康",
+        "injury_status_code": "healthy",
+    },
+    {
+        "id": 6,
+        "student_no": "2026006",
+        "name": "周雨桐",
+        "gender": "女",
+        "age": 19,
+        "level": "一级运动员",
+        "skill_level": "一级运动员",
+        "level_code": "first",
+        "play_style": "右手削攻结合",
+        "injury_status": "观察中",
+        "injury_status_code": "observe",
+    },
+    {
+        "id": 7,
+        "student_no": "2026007",
+        "name": "吴嘉宁",
+        "gender": "男",
+        "age": 20,
+        "level": "二级运动员",
+        "skill_level": "二级运动员",
+        "level_code": "second",
+        "play_style": "左手直板近台快攻",
+        "injury_status": "健康",
+        "injury_status_code": "healthy",
+    },
+    {
+        "id": 8,
+        "student_no": "2026008",
+        "name": "郑可欣",
+        "gender": "女",
+        "age": 18,
+        "level": "青年队",
+        "skill_level": "青年队",
+        "level_code": "youth",
+        "play_style": "右手横板两面弧圈",
+        "injury_status": "康复中",
+        "injury_status_code": "rehab",
+    },
+]
+
+DEMO_TRAINING_PLANS = [
+    {
+        "id": 3,
+        "athlete_id": 5,
+        "athlete_name": "孙泽宇",
+        "coach_id": 1,
+        "coach_name": "张教练",
+        "plan_datetime": "2026-07-03 09:30",
+        "content": "正手连续弧圈与落点控制",
+        "intensity": "高",
+        "duration": 85,
+        "location": "训练馆A",
+    },
+    {
+        "id": 4,
+        "athlete_id": 6,
+        "athlete_name": "周雨桐",
+        "coach_id": 2,
+        "coach_name": "李教练",
+        "plan_datetime": "2026-07-04 14:00",
+        "content": "削球稳定性与防守反击转换",
+        "intensity": "中",
+        "duration": 70,
+        "location": "训练馆B",
+    },
+    {
+        "id": 5,
+        "athlete_id": 7,
+        "athlete_name": "吴嘉宁",
+        "coach_id": 1,
+        "coach_name": "张教练",
+        "plan_datetime": "2026-07-06 10:00",
+        "content": "直板前三板抢攻与台内挑打",
+        "intensity": "高",
+        "duration": 95,
+        "location": "训练馆A",
+    },
+    {
+        "id": 6,
+        "athlete_id": 8,
+        "athlete_name": "郑可欣",
+        "coach_id": 2,
+        "coach_name": "李教练",
+        "plan_datetime": "2026-07-08 16:00",
+        "content": "康复期步法调整与低负荷多球",
+        "intensity": "低",
+        "duration": 60,
+        "location": "康复训练区",
+    },
+    {
+        "id": 7,
+        "athlete_id": 5,
+        "athlete_name": "孙泽宇",
+        "coach_id": 1,
+        "coach_name": "张教练",
+        "plan_datetime": "2026-07-10 09:00",
+        "content": "发球抢攻与反手衔接强化",
+        "intensity": "极高",
+        "duration": 105,
+        "location": "训练馆C",
+    },
+    {
+        "id": 8,
+        "athlete_id": 7,
+        "athlete_name": "吴嘉宁",
+        "coach_id": 2,
+        "coach_name": "李教练",
+        "plan_datetime": "2026-07-12 15:30",
+        "content": "赛前速度耐力与连续变线",
+        "intensity": "中",
+        "duration": 65,
+        "location": "训练馆B",
+    },
+]
+
+DEMO_TECHNICAL_TRAINING_RECORDS = [
+    {
+        "id": 1,
+        "athlete_id": 5,
+        "athlete_name": "孙泽宇",
+        "training_date": "2026-07-03",
+        "footwork_type": "parallel_step",
+        "stroke_technique": "forehand_loop",
+        "multi_ball_minutes": 38,
+        "intensity": "high",
+        "note": "正手连续弧圈质量稳定，需继续压低出台球失误。",
+        "hit_score": 86,
+        "created_by": "coach",
+    },
+    {
+        "id": 2,
+        "athlete_id": 6,
+        "athlete_name": "周雨桐",
+        "training_date": "2026-07-04",
+        "footwork_type": "single_step",
+        "stroke_technique": "defense",
+        "multi_ball_minutes": 32,
+        "intensity": "medium",
+        "note": "削中反攻启动较慢，腕部负荷需控制。",
+        "hit_score": 78,
+        "created_by": "coach",
+    },
+    {
+        "id": 3,
+        "athlete_id": 7,
+        "athlete_name": "吴嘉宁",
+        "training_date": "2026-07-06",
+        "footwork_type": "cross_step",
+        "stroke_technique": "smash",
+        "multi_ball_minutes": 42,
+        "intensity": "high",
+        "note": "侧身后衔接扣杀得分率高，回位速度仍需加强。",
+        "hit_score": 88,
+        "created_by": "coach",
+    },
+    {
+        "id": 4,
+        "athlete_id": 8,
+        "athlete_name": "郑可欣",
+        "training_date": "2026-07-08",
+        "footwork_type": "composite",
+        "stroke_technique": "backhand_drive",
+        "multi_ball_minutes": 25,
+        "intensity": "low",
+        "note": "康复期以稳定触球和小范围移动为主。",
+        "hit_score": 72,
+        "created_by": "coach",
+    },
+    {
+        "id": 5,
+        "athlete_id": 5,
+        "athlete_name": "孙泽宇",
+        "training_date": "2026-07-10",
+        "footwork_type": "composite",
+        "stroke_technique": "serve_receive",
+        "multi_ball_minutes": 45,
+        "intensity": "extreme",
+        "note": "接发抢攻线路主动，极高强度下后半程稳定性下降。",
+        "hit_score": 91,
+        "created_by": "admin",
+    },
+    {
+        "id": 6,
+        "athlete_id": 7,
+        "athlete_name": "吴嘉宁",
+        "training_date": "2026-07-12",
+        "footwork_type": "parallel_step",
+        "stroke_technique": "backhand_drive",
+        "multi_ball_minutes": 36,
+        "intensity": "medium",
+        "note": "反手快拨线路清晰，连续变线后重心保持较好。",
+        "hit_score": 83,
+        "created_by": "coach",
+    },
+]
+
+DEMO_FITNESS_TESTS = [
+    {
+        "id": 5,
+        "athlete_id": 5,
+        "test_date": "2026-07-03 11:00",
+        "tester_id": 2,
+        "upper_strength": 82.0,
+        "lower_strength": 86.0,
+        "flexibility": 78.0,
+        "endurance": 84.0,
+        "speed": 88.0,
+        "overall_score": 83.6,
+        "notes": "速度和下肢力量突出，柔韧性仍有提升空间。",
+        "created_by": "coach",
+    },
+    {
+        "id": 6,
+        "athlete_id": 6,
+        "test_date": "2026-07-04 15:30",
+        "tester_id": 2,
+        "upper_strength": 74.0,
+        "lower_strength": 77.0,
+        "flexibility": 81.0,
+        "endurance": 80.0,
+        "speed": 72.0,
+        "overall_score": 76.8,
+        "notes": "速度偏弱，结合腕部观察期控制上肢负荷。",
+        "created_by": "coach",
+    },
+    {
+        "id": 7,
+        "athlete_id": 7,
+        "test_date": "2026-07-12 17:00",
+        "tester_id": 2,
+        "upper_strength": 79.0,
+        "lower_strength": 83.0,
+        "flexibility": 76.0,
+        "endurance": 82.0,
+        "speed": 85.0,
+        "overall_score": 81.0,
+        "notes": "整体稳定，适合进入赛前专项速度耐力强化。",
+        "created_by": "admin",
+    },
+]
+
+DEMO_INJURY_RECORDS = [
+    {
+        "id": 5,
+        "athlete_id": 6,
+        "injury_date": "2026-07-04",
+        "injury_location": "左腕",
+        "injury_type": "削球负荷性疼痛",
+        "severity": "轻微",
+        "diagnosis": "连续削球训练后腕背疼痛，未见明显肿胀。",
+        "treatment": "降低削球连续组数，训练后冰敷并佩戴护腕。",
+        "recovery_status": "治疗中",
+        "expected_recovery_date": "2026-07-18",
+        "notes": "观察握拍发力角度，避免连续高负荷反手削球。",
+        "created_by": "coach",
+        "is_deleted": False,
+        "deleted_by": "",
+        "deleted_at": "",
+        "delete_reason": "",
+    },
+    {
+        "id": 6,
+        "athlete_id": 8,
+        "injury_date": "2026-07-01",
+        "injury_location": "右踝",
+        "injury_type": "轻度扭伤恢复期",
+        "severity": "中度",
+        "diagnosis": "右踝外侧韧带轻度扭伤后恢复期，跳步仍有不适。",
+        "treatment": "踝关节稳定训练，限制大范围交叉步移动。",
+        "recovery_status": "康复中",
+        "expected_recovery_date": "2026-07-25",
+        "notes": "低强度多球配合康复评估，逐步恢复对抗。",
+        "created_by": "coach",
+        "is_deleted": False,
+        "deleted_by": "",
+        "deleted_at": "",
+        "delete_reason": "",
+    },
+]
+
+DEMO_MATCH_RESULTS = [
+    {
+        "id": 6,
+        "athlete_id": 5,
+        "match_date": "2026-07-11",
+        "match_name": "市青少年积分赛",
+        "opponent": "郑远",
+        "result": "胜",
+        "score": "3:1",
+        "rank": "四强",
+        "key_points": "第三局 8:8 后通过发球抢攻连续拿下两分。",
+        "tactic_review": "正手弧圈落点变化充分，反手衔接比训练初期更稳定。",
+        "improvement": "领先阶段需要减少冒险接发抢攻。",
+    },
+]
+
+ADDITIONAL_ATHLETE_PROFILES = [
+    {"name": "韩子昂", "gender": "男", "age": 18, "level_code": "youth", "play_style": "右手横板正手抢攻"},
+    {"name": "林思琪", "gender": "女", "age": 19, "level_code": "second", "play_style": "左手横板两面弧圈"},
+    {"name": "许明远", "gender": "男", "age": 20, "level_code": "first", "play_style": "右手直板快攻结合推挡"},
+    {"name": "罗佳怡", "gender": "女", "age": 17, "level_code": "youth", "play_style": "右手横板防守反击"},
+    {"name": "高俊熙", "gender": "男", "age": 21, "level_code": "first", "play_style": "右手横板中远台弧圈"},
+    {"name": "唐婉宁", "gender": "女", "age": 18, "level_code": "second", "play_style": "右手横板快带快撕"},
+    {"name": "魏晨皓", "gender": "男", "age": 19, "level_code": "youth", "play_style": "左手直板前三板抢攻"},
+    {"name": "沈若彤", "gender": "女", "age": 20, "level_code": "first", "play_style": "右手横板削攻结合"},
+    {"name": "蒋宇航", "gender": "男", "age": 18, "level_code": "second", "play_style": "右手横板反手拧拉"},
+    {"name": "马依然", "gender": "女", "age": 21, "level_code": "first", "play_style": "左手横板落点变化"},
+    {"name": "邓凯文", "gender": "男", "age": 17, "level_code": "youth", "play_style": "右手直板近台快攻"},
+    {"name": "方语桐", "gender": "女", "age": 19, "level_code": "second", "play_style": "右手横板发抢衔接"},
+    {"name": "秦浩宇", "gender": "男", "age": 20, "level_code": "first", "play_style": "右手横板力量弧圈"},
+    {"name": "白欣妍", "gender": "女", "age": 18, "level_code": "youth", "play_style": "左手横板快攻快带"},
+    {"name": "丁睿泽", "gender": "男", "age": 21, "level_code": "first", "play_style": "右手横板相持控制"},
+    {"name": "姚可薇", "gender": "女", "age": 20, "level_code": "second", "play_style": "右手横板反手压制"},
+    {"name": "孟泽霖", "gender": "男", "age": 18, "level_code": "youth", "play_style": "左手横板发球变化"},
+    {"name": "程安琪", "gender": "女", "age": 19, "level_code": "first", "play_style": "右手横板两面快拉"},
+    {"name": "薛景辰", "gender": "男", "age": 20, "level_code": "second", "play_style": "右手直板台内控制"},
+    {"name": "梁沐瑶", "gender": "女", "age": 17, "level_code": "youth", "play_style": "右手横板速度型打法"},
+    {"name": "叶承佑", "gender": "男", "age": 21, "level_code": "first", "play_style": "左手横板正反手均衡"},
+    {"name": "苏芷晴", "gender": "女", "age": 18, "level_code": "second", "play_style": "右手横板防守转换"},
+]
+ADDITIONAL_ATHLETE_COUNT = len(ADDITIONAL_ATHLETE_PROFILES)
+
+_ADDITIONAL_LEVEL_NAMES = {
+    "national": "国家级",
+    "first": "一级运动员",
+    "second": "二级运动员",
+    "youth": "青年队",
+}
+_ADDITIONAL_STATUS_SEQUENCE = [
+    ("健康", "healthy"),
+    ("观察中", "observe"),
+    ("健康", "healthy"),
+    ("康复中", "rehab"),
+]
+_ADDITIONAL_INTENSITIES = ["低", "中", "高", "极高"]
+_ADDITIONAL_TECHNICAL_INTENSITIES = ["low", "medium", "high", "extreme"]
+_ADDITIONAL_TREND_MONTHS = [
+    "2025-10",
+    "2025-11",
+    "2025-12",
+    "2026-01",
+    "2026-02",
+    "2026-03",
+    "2026-04",
+    "2026-05",
+    "2026-06",
+    "2026-07",
+]
+_ADDITIONAL_FOOTWORK_TYPES = ["single_step", "parallel_step", "cross_step", "composite"]
+_ADDITIONAL_STROKE_TECHNIQUES = [
+    "forehand_loop",
+    "backhand_drive",
+    "serve_receive",
+    "smash",
+    "defense",
+]
+_ADDITIONAL_INJURY_DETAILS = [
+    (9, "右肩", "肩袖疲劳", "轻微", "治疗中"),
+    (12, "左膝", "跳步落地不适", "中度", "康复中"),
+    (15, "腰背", "核心疲劳性疼痛", "轻微", "治疗中"),
+    (18, "右腕", "连续拧拉负荷反应", "轻微", "治疗中"),
+    (21, "左踝", "移动急停扭伤", "中度", "康复中"),
+    (24, "右肘", "发球训练后酸痛", "轻微", "治疗中"),
+    (27, "大腿后侧", "肌肉拉伤恢复期", "中度", "康复中"),
+    (30, "左肩", "防守转换拉伤", "轻微", "治疗中"),
+]
+_ADDITIONAL_MATCH_OPPONENTS = [
+    "陈越",
+    "赵宁",
+    "顾然",
+    "陆佳",
+    "田峰",
+    "何曼",
+    "熊磊",
+    "曹悦",
+    "石博",
+    "刘宸",
+    "冯雪",
+]
+
+ADDITIONAL_DEMO_PLAYERS = [
+    {
+        "id": index + 9,
+        "student_no": f"2026{index + 9:03d}",
+        "name": profile["name"],
+        "gender": profile["gender"],
+        "age": profile["age"],
+        "level": _ADDITIONAL_LEVEL_NAMES[profile["level_code"]],
+        "skill_level": _ADDITIONAL_LEVEL_NAMES[profile["level_code"]],
+        "level_code": profile["level_code"],
+        "play_style": profile["play_style"],
+        "injury_status": _ADDITIONAL_STATUS_SEQUENCE[index % len(_ADDITIONAL_STATUS_SEQUENCE)][0],
+        "injury_status_code": _ADDITIONAL_STATUS_SEQUENCE[index % len(_ADDITIONAL_STATUS_SEQUENCE)][1],
+    }
+    for index, profile in enumerate(ADDITIONAL_ATHLETE_PROFILES)
+]
+
+ADDITIONAL_DEMO_TRAINING_PLANS = [
+    {
+        "id": index + 9,
+        "athlete_id": player["id"],
+        "athlete_name": player["name"],
+        "coach_id": 1 if index % 2 == 0 else 2,
+        "coach_name": "张教练" if index % 2 == 0 else "李教练",
+        "plan_datetime": (
+            f"{_ADDITIONAL_TREND_MONTHS[index % len(_ADDITIONAL_TREND_MONTHS)]}"
+            f"-{(index % 20) + 1:02d} {8 + (index % 8):02d}:30"
+        ),
+        "content": f"{player['play_style']}专项巩固与多球衔接",
+        "intensity": _ADDITIONAL_INTENSITIES[index % len(_ADDITIONAL_INTENSITIES)],
+        "duration": 65 + (index % 6) * 10,
+        "location": f"训练馆{chr(ord('A') + index % 3)}",
+    }
+    for index, player in enumerate(ADDITIONAL_DEMO_PLAYERS)
+]
+
+ADDITIONAL_DEMO_TECHNICAL_TRAINING_RECORDS = [
+    {
+        "id": index + 7,
+        "athlete_id": player["id"],
+        "athlete_name": player["name"],
+        "training_date": (
+            f"{_ADDITIONAL_TREND_MONTHS[index % len(_ADDITIONAL_TREND_MONTHS)]}"
+            f"-{(index % 20) + 1:02d}"
+        ),
+        "footwork_type": _ADDITIONAL_FOOTWORK_TYPES[index % len(_ADDITIONAL_FOOTWORK_TYPES)],
+        "stroke_technique": _ADDITIONAL_STROKE_TECHNIQUES[index % len(_ADDITIONAL_STROKE_TECHNIQUES)],
+        "multi_ball_minutes": 28 + (index % 7) * 4,
+        "intensity": _ADDITIONAL_TECHNICAL_INTENSITIES[index % len(_ADDITIONAL_TECHNICAL_INTENSITIES)],
+        "note": f"{player['name']}完成专项技术训练，重点跟踪步法衔接和击球稳定性。",
+        "hit_score": 74 + (index % 9) * 2,
+        "created_by": "coach" if index % 3 else "admin",
+    }
+    for index, player in enumerate(ADDITIONAL_DEMO_PLAYERS)
+]
+
+ADDITIONAL_DEMO_FITNESS_TESTS = [
+    {
+        "id": index + 8,
+        "athlete_id": player["id"],
+        "test_date": (
+            f"{_ADDITIONAL_TREND_MONTHS[index % len(_ADDITIONAL_TREND_MONTHS)]}"
+            f"-{(index % 20) + 1:02d} {10 + (index % 6):02d}:00"
+        ),
+        "tester_id": 2,
+        "upper_strength": float(72 + index % 15),
+        "lower_strength": float(74 + (index * 2) % 15),
+        "flexibility": float(70 + (index * 3) % 16),
+        "endurance": float(76 + (index * 4) % 14),
+        "speed": float(73 + (index * 5) % 17),
+        "overall_score": round(
+            (
+                (72 + index % 15)
+                + (74 + (index * 2) % 15)
+                + (70 + (index * 3) % 16)
+                + (76 + (index * 4) % 14)
+                + (73 + (index * 5) % 17)
+            )
+            / 5,
+            1,
+        ),
+        "notes": f"{player['name']}体能测试完成，后续按短板指标同步训练负荷。",
+        "created_by": "coach" if index % 2 else "admin",
+    }
+    for index, player in enumerate(ADDITIONAL_DEMO_PLAYERS)
+]
+
+ADDITIONAL_DEMO_INJURY_RECORDS = [
+    {
+        "id": index + 7,
+        "athlete_id": athlete_id,
+        "injury_date": f"2026-07-{index + 3:02d}",
+        "injury_location": location,
+        "injury_type": injury_type,
+        "severity": severity,
+        "diagnosis": f"{location}{injury_type}，需结合训练负荷进行观察。",
+        "treatment": "降低相关专项强度，训练后冰敷或康复拉伸。",
+        "recovery_status": recovery_status,
+        "expected_recovery_date": f"2026-07-{index + 18:02d}",
+        "notes": "与训练计划联动控制负荷，复训前完成教练评估。",
+        "created_by": "coach",
+        "is_deleted": False,
+        "deleted_by": "",
+        "deleted_at": "",
+        "delete_reason": "",
+    }
+    for index, (athlete_id, location, injury_type, severity, recovery_status) in enumerate(
+        _ADDITIONAL_INJURY_DETAILS
+    )
+]
+
+ADDITIONAL_DEMO_MATCH_RESULTS = [
+    {
+        "id": index + 7,
+        "athlete_id": player["id"],
+        "match_date": f"2026-07-{index + 2:02d}",
+        "match_name": "队内积分循环赛",
+        "opponent": _ADDITIONAL_MATCH_OPPONENTS[index],
+        "result": ["胜", "负", "胜", "平"][index % 4],
+        "score": ["3:1", "2:3", "3:0", "2:2"][index % 4],
+        "rank": f"第{index + 1}轮",
+        "key_points": "关键分处理和发接发轮次作为复盘重点。",
+        "tactic_review": f"{player['name']}在比赛中执行了既定线路和节奏变化。",
+        "improvement": "继续提高领先阶段稳定性和相持球落点质量。",
+    }
+    for index, player in enumerate(ADDITIONAL_DEMO_PLAYERS[:11])
+]
+
+DEMO_EXTENSION_RECORD_COUNT = (
+    len(DEMO_PLAYERS)
+    + len(DEMO_TRAINING_PLANS)
+    + len(DEMO_TECHNICAL_TRAINING_RECORDS)
+    + len(DEMO_FITNESS_TESTS)
+    + len(DEMO_INJURY_RECORDS)
+    + len(DEMO_MATCH_RESULTS)
+)
+ADDITIONAL_DEMO_RECORD_COUNT = (
+    len(ADDITIONAL_DEMO_PLAYERS)
+    + len(ADDITIONAL_DEMO_TRAINING_PLANS)
+    + len(ADDITIONAL_DEMO_TECHNICAL_TRAINING_RECORDS)
+    + len(ADDITIONAL_DEMO_FITNESS_TESTS)
+    + len(ADDITIONAL_DEMO_INJURY_RECORDS)
+    + len(ADDITIONAL_DEMO_MATCH_RESULTS)
+)
+
+PLAYERS.extend(DEMO_PLAYERS)
+PLAYERS.extend(ADDITIONAL_DEMO_PLAYERS)
+TRAINING_PLANS.extend(DEMO_TRAINING_PLANS)
+TRAINING_PLANS.extend(ADDITIONAL_DEMO_TRAINING_PLANS)
+TECHNICAL_TRAINING_RECORDS.extend(DEMO_TECHNICAL_TRAINING_RECORDS)
+TECHNICAL_TRAINING_RECORDS.extend(ADDITIONAL_DEMO_TECHNICAL_TRAINING_RECORDS)
+FITNESS_TESTS.extend(DEMO_FITNESS_TESTS)
+FITNESS_TESTS.extend(ADDITIONAL_DEMO_FITNESS_TESTS)
+INJURY_RECORDS.extend(DEMO_INJURY_RECORDS)
+INJURY_RECORDS.extend(ADDITIONAL_DEMO_INJURY_RECORDS)
+MATCH_RESULTS.extend(DEMO_MATCH_RESULTS)
+MATCH_RESULTS.extend(ADDITIONAL_DEMO_MATCH_RESULTS)
+PLAN_ID_COUNTER = max(plan["id"] for plan in TRAINING_PLANS) + 1
+
 ROLE_PERMISSION_MATRIX = [
     {"module": "运动员档案", "admin": "新增 / 修改 / 删除 / 查询", "coach": "查询与训练关联查看"},
     {"module": "训练数据录入", "admin": "导入 / 导出 / 编辑 / 删除", "coach": "新增训练与专项记录"},
@@ -569,11 +1115,21 @@ MODULE_FEATURES = {
 }
 
 
+def env_int(name, default):
+    try:
+        return int(os.getenv(name, default))
+    except (TypeError, ValueError):
+        return default
+
+
 def create_app():
     from coaches import bp as coaches_bp
 
     app = Flask(__name__)
-    app.config["SECRET_KEY"] = "dev-secret-key-change-before-production"
+    app.config["SECRET_KEY"] = (
+        os.getenv("SECRET_KEY") or os.getenv("FLASK_SECRET_KEY") or secrets.token_hex(32)
+    )
+    app.config["MAX_CONTENT_LENGTH"] = env_int("MAX_CONTENT_LENGTH", 5 * 1024 * 1024)
 
     @app.context_processor
     def inject_layout_data():
@@ -585,16 +1141,26 @@ def create_app():
         return {
             "current_user": user,
             "nav_items": visible_nav_items,
+            "csrf_token": csrf_token,
         }
 
     @app.before_request
     def require_login():
-        public_endpoints = {"login", "static"}
+        public_endpoints = {"login", "static", "healthz"}
         if request.endpoint in public_endpoints:
             return None
         if not session.get("username"):
-            return redirect(url_for("login", next=request.path))
+            next_url = request.full_path if request.query_string else request.path
+            return redirect(url_for("login", next=next_url))
         return None
+
+    @app.before_request
+    def protect_write_requests():
+        return validate_csrf_token()
+
+    @app.route("/healthz")
+    def healthz():
+        return {"status": "ok"}
 
     @app.route("/login", methods=["GET", "POST"])
     def login():
@@ -609,7 +1175,8 @@ def create_app():
             if user and user["password"] == password:
                 session["username"] = username
                 flash(f"欢迎回来，{user['name']}。", "success")
-                next_url = request.args.get("next") or url_for("index")
+                requested_next = request.args.get("next")
+                next_url = requested_next if is_safe_redirect_url(requested_next) else url_for("index")
                 return redirect(next_url)
 
             flash("用户名或密码错误，请重新输入。", "danger")
@@ -741,8 +1308,8 @@ def create_app():
 
     training_bp = Blueprint("training", __name__, url_prefix="/training")
 
-    @training_bp.route("/plans", endpoint="plans")
-    @training_bp.route("/plans", methods=["GET", "POST"])
+    @training_bp.route("/plans", methods=["GET", "POST"], endpoint="plans")
+    @role_required("admin", "coach")
     def training_plans():
         """训练计划列表、查询、新增"""
         if request.method == "POST":
@@ -869,8 +1436,20 @@ def create_app():
     @role_required("admin", "coach")
     def delete_plan(plan_id):
         """删除训练计划"""
-        global TRAINING_PLANS
-        TRAINING_PLANS = [p for p in TRAINING_PLANS if p["id"] != plan_id]
+        plan = next((p for p in TRAINING_PLANS if p["id"] == plan_id), None)
+        if not plan:
+            flash("训练计划不存在", "danger")
+            return redirect(url_for("training.plans"))
+        if not can_delete_training_plan(plan, current_user()):
+            return render_template("auth/forbidden.html"), 403
+        TRAINING_PLANS[:] = [p for p in TRAINING_PLANS if p["id"] != plan_id]
+        record_audit_log(
+            action="delete",
+            target_type="training_plan",
+            target_id=plan_id,
+            before=plan,
+            user=current_user(),
+        )
         flash("训练计划已删除", "success")
         return redirect(url_for("training.plans"))
     @training_bp.route("/batch-import", methods=["GET", "POST"], endpoint="batch_import")
@@ -899,7 +1478,6 @@ def create_app():
         )
 
     @training_bp.route("/records", endpoint="record")
-    @training_bp.route("/training_record", endpoint="training_record")
     @role_required("admin", "coach")
     def training_records():
         records, active_condition_count = filter_technical_training_records(request.args)
@@ -914,6 +1492,11 @@ def create_app():
             technical_intensity_labels=TECHNICAL_INTENSITY_LABELS,
             summary=build_technical_training_summary(records),
         )
+
+    @training_bp.route("/training_record", endpoint="training_record")
+    @role_required("admin", "coach")
+    def legacy_training_record_redirect():
+        return redirect(url_for("training.record"), code=301)
 
     @training_bp.route("/records/<int:record_id>/edit", methods=["POST"], endpoint="edit_record")
     @role_required("admin", "coach")
@@ -1962,16 +2545,37 @@ def build_home_dashboard_data():
         for intensity in intensity_order
     ]
 
+    fitness_radar_indicators = [
+        {"name": "上肢力量", "max": 100},
+        {"name": "下肢力量", "max": 100},
+        {"name": "柔韧性", "max": 100},
+        {"name": "耐力", "max": 100},
+        {"name": "速度", "max": 100},
+        {"name": "爆发力", "max": 100},
+        {"name": "敏捷", "max": 100},
+        {"name": "核心稳定", "max": 100},
+        {"name": "移动效率", "max": 100},
+        {"name": "恢复指数", "max": 100},
+    ]
     if FITNESS_TESTS:
-        fitness_radar_values = [
+        base_metrics = [
             round(sum(test["upper_strength"] for test in FITNESS_TESTS) / len(FITNESS_TESTS), 1),
             round(sum(test["lower_strength"] for test in FITNESS_TESTS) / len(FITNESS_TESTS), 1),
             round(sum(test["flexibility"] for test in FITNESS_TESTS) / len(FITNESS_TESTS), 1),
             round(sum(test["endurance"] for test in FITNESS_TESTS) / len(FITNESS_TESTS), 1),
             round(sum(test["speed"] for test in FITNESS_TESTS) / len(FITNESS_TESTS), 1),
         ]
+        upper_strength, lower_strength, flexibility, endurance, speed = base_metrics
+        derived_metrics = [
+            round((lower_strength + speed) / 2, 1),
+            round((speed + flexibility) / 2, 1),
+            round((upper_strength + lower_strength + flexibility) / 3, 1),
+            round((speed + endurance) / 2, 1),
+            round((flexibility + endurance) / 2, 1),
+        ]
+        fitness_radar_values = base_metrics + derived_metrics
     else:
-        fitness_radar_values = [0, 0, 0, 0, 0]
+        fitness_radar_values = [0 for _ in fitness_radar_indicators]
 
     return {
         "generated_at": datetime.now().strftime("%Y-%m-%d %H:%M"),
@@ -1984,8 +2588,9 @@ def build_home_dashboard_data():
         "injury_pie": stats["injury_pie"],
         "intensity_month_labels": intensity_month_labels,
         "intensity_series": intensity_series,
+        "fitness_radar_indicators": fitness_radar_indicators,
         "fitness_radar_values": fitness_radar_values,
-        "fitness_target_values": [85, 86, 82, 86, 88],
+        "fitness_target_values": [85, 86, 82, 86, 88, 87, 84, 85, 86, 83],
     }
 
 
@@ -3035,32 +3640,6 @@ def is_float_value(value):
         return True
     except ValueError:
         return False
-
-
-def current_user():
-    username = session.get("username")
-    if not username:
-        return None
-    user = USERS.get(username)
-    if not user:
-        return None
-    return {"username": username, **user}
-
-
-def role_required(*roles):
-    def decorator(view_func):
-        @wraps(view_func)
-        def wrapper(*args, **kwargs):
-            user = current_user()
-            if not user:
-                return redirect(url_for("login", next=request.path))
-            if user["role"] not in roles:
-                return render_template("auth/forbidden.html"), 403
-            return view_func(*args, **kwargs)
-
-        return wrapper
-
-    return decorator
 
 
 def module_page(module_name, module_desc):

@@ -1,6 +1,7 @@
 from copy import deepcopy
 
 from app import PLAYERS, app
+from tests.helpers import csrf_data
 
 
 def login(client, username="admin", password="admin123"):
@@ -35,7 +36,7 @@ def test_admin_can_create_view_edit_delete_player_and_filter():
 
         create_response = client.post(
             "/players/create",
-            data=player_payload(),
+            data=csrf_data(client, player_payload()),
             follow_redirects=True,
         )
 
@@ -64,7 +65,10 @@ def test_admin_can_create_view_edit_delete_player_and_filter():
 
         edit_response = client.post(
             f"/players/{created['id']}/edit",
-            data=player_payload(name="测试队员改", age="19", level_code="second"),
+            data=csrf_data(
+                client,
+                player_payload(name="测试队员改", age="19", level_code="second"),
+            ),
             follow_redirects=True,
         )
 
@@ -75,6 +79,7 @@ def test_admin_can_create_view_edit_delete_player_and_filter():
 
         delete_response = client.post(
             f"/players/{created['id']}/delete",
+            data=csrf_data(client),
             follow_redirects=True,
         )
 

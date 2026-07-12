@@ -2,6 +2,7 @@ from copy import deepcopy
 
 import app as app_module
 from app import PLAYERS, app
+from tests.helpers import csrf_data
 
 
 def login(client, username="admin", password="admin123"):
@@ -24,15 +25,18 @@ def test_specialized_training_records_support_crud_and_complex_filters():
 
         create_response = client.post(
             "/training/batch-import",
-            data={
-                "athlete_id": "3",
-                "training_date": "2026-07-08",
-                "footwork_type": "cross_step",
-                "stroke_technique": "smash",
-                "multi_ball_minutes": "35",
-                "intensity": "high",
-                "training_note": "precision footwork note",
-            },
+            data=csrf_data(
+                client,
+                {
+                    "athlete_id": "3",
+                    "training_date": "2026-07-08",
+                    "footwork_type": "cross_step",
+                    "stroke_technique": "smash",
+                    "multi_ball_minutes": "35",
+                    "intensity": "high",
+                    "training_note": "precision footwork note",
+                },
+            ),
             follow_redirects=True,
         )
 
@@ -66,15 +70,18 @@ def test_specialized_training_records_support_crud_and_complex_filters():
 
         edit_response = client.post(
             f"/training/records/{record_id}/edit",
-            data={
-                "athlete_id": "3",
-                "training_date": "2026-07-09",
-                "footwork_type": "composite",
-                "stroke_technique": "serve_receive",
-                "multi_ball_minutes": "45",
-                "intensity": "medium",
-                "training_note": "updated record note",
-            },
+            data=csrf_data(
+                client,
+                {
+                    "athlete_id": "3",
+                    "training_date": "2026-07-09",
+                    "footwork_type": "composite",
+                    "stroke_technique": "serve_receive",
+                    "multi_ball_minutes": "45",
+                    "intensity": "medium",
+                    "training_note": "updated record note",
+                },
+            ),
             follow_redirects=True,
         )
 
@@ -84,6 +91,7 @@ def test_specialized_training_records_support_crud_and_complex_filters():
 
         delete_response = client.post(
             f"/training/records/{record_id}/delete",
+            data=csrf_data(client),
             follow_redirects=True,
         )
 

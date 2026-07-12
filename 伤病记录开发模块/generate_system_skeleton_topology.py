@@ -116,7 +116,7 @@ def arrow(draw, start, end, fill=PALETTE["line"], width=3):
 def draw_project_tree(draw):
     x, y, w, h = 70, 255, 760, 1170
     rounded_box(draw, (x, y, x + w, y + h), PALETTE["root"], outline="#78909c", radius=22, width=3)
-    draw.text((x + 28, y + 24), "项目根目录：乒乓球运动员综合训练监控管理系统", font=FONT_H2, fill=PALETTE["ink"])
+    draw.text((x + 28, y + 24), "乒乓球运动员综合训练监控管理系统", font=FONT_H2, fill=PALETTE["ink"])
     draw.text((x + 30, y + 66), str(ROOT), font=FONT_TINY, fill=PALETTE["muted"])
 
     tree_lines = [
@@ -292,7 +292,7 @@ def draw_injury_vertical_slice(draw):
 
 
 def draw_footer(draw):
-    footer = "生成文件：伤病记录开发模块/系统骨架工程目录拓扑图.png    脚本：伤病记录开发模块/generate_system_skeleton_topology.py"
+    footer = "伤病记录开发模块  脚本：伤病记录开发模块/generate_system_skeleton_topology.py"
     draw.text((72, 1480), footer, font=FONT_SMALL, fill=PALETTE["muted"])
 
 
@@ -303,7 +303,7 @@ def main():
     draw.text((70, 54), "系统骨架工程目录拓扑图", font=FONT_TITLE, fill=PALETTE["ink"])
     draw.text(
         (72, 125),
-        "项目级视角：目录组织、运行入口、Web 分层、数据库脚本、测试验证与伤病记录模块交付物",
+        "目录组织、运行入口、Web 分层、数据库脚本、测试验证与伤病记录模块交付物",
         font=FONT_SUBTITLE,
         fill=PALETTE["muted"],
     )

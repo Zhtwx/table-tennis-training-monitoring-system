@@ -3,6 +3,7 @@ import io
 import openpyxl
 
 from app import TECHNICAL_TRAINING_RECORDS, app
+from tests.helpers import csrf_data
 
 
 def login(client, username="admin", password="admin123"):
@@ -55,10 +56,13 @@ def test_stats_import_accepts_member9_skill_excel_format():
     try:
         response = client.post(
             "/stats/import-export",
-            data={
-                "action": "import_skill",
-                "skill_excel": (payload, "member9_skill.xlsx"),
-            },
+            data=csrf_data(
+                client,
+                {
+                    "action": "import_skill",
+                    "skill_excel": (payload, "member9_skill.xlsx"),
+                },
+            ),
             content_type="multipart/form-data",
             follow_redirects=True,
         )
@@ -74,4 +78,3 @@ def test_stats_import_accepts_member9_skill_excel_format():
         assert "步法时长" in imported["note"]
     finally:
         del TECHNICAL_TRAINING_RECORDS[before_count:]
-

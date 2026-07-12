@@ -16,5 +16,7 @@ uploads/
 *.db
 *.sqlite
 *.sqlite3
+专项技术记录模块开发模块/
+统计分析与 Excel 数据导入导出模块/
 .DS_Store
 Thumbs.db

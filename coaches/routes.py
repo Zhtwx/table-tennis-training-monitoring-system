@@ -3,6 +3,7 @@ from datetime import date
 from flask import flash, redirect, render_template, request, url_for
 from pymysql import MySQLError
 
+from auth_utils import role_required
 from db import get_mysql_connection
 from . import bp
 
@@ -202,6 +203,7 @@ def list_coaches():
 
 
 @bp.route("/add", methods=["GET", "POST"])
+@role_required("admin")
 def add_coach():
     if request.method == "POST":
         query = """
@@ -230,6 +232,7 @@ def add_coach():
 
 
 @bp.route("/edit/<int:id>", methods=["GET", "POST"])
+@role_required("admin")
 def edit_coach(id):
     if request.method == "POST":
         query = """
@@ -289,6 +292,7 @@ def edit_coach(id):
 
 
 @bp.route("/delete/<int:id>", methods=["POST"])
+@role_required("admin")
 def delete_coach(id):
     try:
         result = fetch_one("SELECT COUNT(*) AS total FROM training_plan WHERE coach_id=%s", (id,))
