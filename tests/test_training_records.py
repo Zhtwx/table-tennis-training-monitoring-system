@@ -1,5 +1,7 @@
 from copy import deepcopy
+import io
 
+import openpyxl
 import app as app_module
 from app import PLAYERS, app
 from tests.helpers import csrf_data
@@ -111,3 +113,41 @@ def test_training_record_form_uses_current_player_list():
 
     assert response.status_code == 200
     assert PLAYERS[-1]["name"] in body
+
+
+def test_skill_excel_import_accepts_player_name_and_student_no():
+    original_records = deepcopy(get_training_records())
+    try:
+        client = app.test_client()
+        login(client)
+
+        workbook = openpyxl.Workbook()
+        sheet = workbook.active
+        sheet.append(["运动员编号或姓名", "训练日期", "步法类型", "击球技术", "多球时长", "训练强度", "备注"])
+        sheet.append([PLAYERS[0]["name"], "2026-07-10", "交叉步", "扣杀", 30, "高强度", "name import"])
+        sheet.append([PLAYERS[1]["student_no"], "2026-07-11", "综合步法", "发接发", 35, "中强度", "student import"])
+        payload = io.BytesIO()
+        workbook.save(payload)
+        payload.seek(0)
+
+        response = client.post(
+            "/training/records/import-excel",
+            data=csrf_data(
+                client,
+                {"training_excel": (payload, "skill_import.xlsx")},
+            ),
+            content_type="multipart/form-data",
+            follow_redirects=True,
+        )
+
+        body = response.get_data(as_text=True)
+        records = get_training_records()
+
+        assert response.status_code == 200
+        assert "成功导入 2 条专项技术记录" in body
+        assert len(records) == len(original_records) + 2
+        assert records[-2]["athlete_id"] == PLAYERS[0]["id"]
+        assert records[-1]["athlete_id"] == PLAYERS[1]["id"]
+    finally:
+        records = get_training_records()
+        records[:] = original_records

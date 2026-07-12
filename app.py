@@ -1537,16 +1537,16 @@ def create_app():
                 athlete_value, training_date, footwork, stroke, minutes, intensity, note = (list(row) + [None] * 7)[:7]
                 if not any([athlete_value, training_date, footwork, stroke, minutes, intensity, note]):
                     continue
-                form = {
-                    "athlete_id": resolve_athlete_id(athlete_value),
-                    "training_date": normalize_excel_date(training_date),
-                    "footwork_type": resolve_option_code(footwork, FOOTWORK_TYPE_LABELS),
-                    "stroke_technique": resolve_option_code(stroke, STROKE_TECHNIQUE_LABELS),
-                    "multi_ball_minutes": "" if minutes is None else str(minutes),
-                    "intensity": resolve_option_code(intensity, TECHNICAL_INTENSITY_LABELS),
-                    "training_note": "" if note is None else str(note),
-                }
                 try:
+                    form = {
+                        "athlete_id": resolve_athlete_id(athlete_value),
+                        "training_date": normalize_excel_date(training_date),
+                        "footwork_type": resolve_option_code(footwork, FOOTWORK_TYPE_LABELS),
+                        "stroke_technique": resolve_option_code(stroke, STROKE_TECHNIQUE_LABELS),
+                        "multi_ball_minutes": "" if minutes is None else str(minutes),
+                        "intensity": resolve_option_code(intensity, TECHNICAL_INTENSITY_LABELS),
+                        "training_note": "" if note is None else str(note),
+                    }
                     save_technical_training_record(form, current_user()["username"])
                     imported_count += 1
                 except ValidationError as exc:
@@ -2614,16 +2614,16 @@ def import_stats_skill_excel(file, operator):
                 continue
 
             athlete_value, training_date, footwork_value, stroke_or_score, minutes_value, intensity_value, note_value = values
-            form, hit_score = build_stats_import_form(
-                athlete_value,
-                training_date,
-                footwork_value,
-                stroke_or_score,
-                minutes_value,
-                intensity_value,
-                note_value,
-            )
             try:
+                form, hit_score = build_stats_import_form(
+                    athlete_value,
+                    training_date,
+                    footwork_value,
+                    stroke_or_score,
+                    minutes_value,
+                    intensity_value,
+                    note_value,
+                )
                 save_technical_training_record(form, operator)
                 if hit_score is not None and TECHNICAL_TRAINING_RECORDS:
                     TECHNICAL_TRAINING_RECORDS[-1]["hit_score"] = hit_score
@@ -2784,13 +2784,33 @@ def resolve_athlete_id(value):
     if value is None:
         return ""
     text = str(value).strip()
+    if not text:
+        return ""
+
+    numeric_text = text[:-2] if text.endswith(".0") and text[:-2].isdigit() else text
+    if numeric_text.isdigit():
+        player = next((item for item in PLAYERS if item["id"] == int(numeric_text)), None)
+        if player:
+            return str(player["id"])
+        player = next(
+            (item for item in PLAYERS if item["student_no"] == numeric_text),
+            None,
+        )
+        if player:
+            return str(player["id"])
+
     if text.isdigit():
-        return text
+        player = next((item for item in PLAYERS if item["student_no"] == text), None)
+        if player:
+            return str(player["id"])
+
     player = next(
         (item for item in PLAYERS if item["name"] == text or item["student_no"] == text),
         None,
     )
-    return str(player["id"]) if player else text
+    if player:
+        return str(player["id"])
+    raise ValidationError(f"找不到运动员：{text}")
 
 
 def resolve_option_code(value, options):
