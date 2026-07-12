@@ -93,7 +93,7 @@ def pill(x, y, text, fill, outline):
 
 rounded_rect((60, 40, W - 60, 150), "#0f3d66", outline="#0f3d66", radius=26)
 text_center((60, 48, W - 60, 102), "伤病状态更新触发器状态迁移图", F_TITLE, "#ffffff")
-text_center((60, 102, W - 60, 144), "成员8 · 伤病记录模块 · injury_record 触发器联动 athlete.injury_status", F_SUB, "#dbeafe")
+text_center((60, 102, W - 60, 144), "伤病记录模块 · injury_record 触发器联动 athlete.injury_status", F_SUB, "#dbeafe")
 
 sections = [
     ((90, 210, 420, 340), "业务操作层", "新增 / 修改 / 作废\n伤病记录"),
@@ -167,8 +167,6 @@ x = pill(x, 1342, "伤病中：严重治疗中，禁止高强度训练", "#fee2e
 x = pill(x, 1342, "观察中：普通治疗中，降低训练负荷", "#fef3c7", "#d97706") + 25
 x = pill(x, 1342, "康复中：恢复过渡，限制对抗训练", "#dbeafe", "#2563eb") + 25
 pill(x, 1342, "健康：无有效未恢复伤病", "#dcfce7", "#16a34a")
-
-text_center((60, 1412, W - 60, 1445), "输出文件：伤病状态更新触发器状态迁移图.png · 适用于课程设计报告 5.6 触发器设计章节", F_TINY, "#64748b")
 
 img.save(out_path, quality=95)
 print(out_path)
