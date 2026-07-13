@@ -3,7 +3,7 @@ import io
 
 import openpyxl
 import app as app_module
-from app import PLAYERS, app
+from app import FOOTWORK_TRAINING_RECORDS, PLAYERS, TECHNIQUE_TACTIC_TRAINING_RECORDS, app, find_dict_by_code
 from tests.helpers import csrf_data
 
 
@@ -15,272 +15,215 @@ def login(client, username="admin", password="admin123"):
     )
 
 
-def get_training_records():
-    return getattr(app_module, "TECHNICAL_TRAINING_RECORDS", [])
-
-
-def test_specialized_training_records_support_crud_and_complex_filters():
-    original_records = deepcopy(get_training_records())
+def test_footwork_training_supports_crud_and_filters():
+    original_records = deepcopy(FOOTWORK_TRAINING_RECORDS)
     try:
         client = app.test_client()
         login(client)
+        footwork_dict_id = find_dict_by_code("cross_step")["id"]
 
         create_response = client.post(
-            "/training/batch-import",
+            "/training/footwork",
             data=csrf_data(
                 client,
                 {
                     "athlete_id": "3",
                     "training_date": "2026-07-08",
-                    "footwork_type": "cross_step",
-                    "stroke_technique": "smash",
-                    "multi_ball_minutes": "35",
-                    "intensity": "high",
+                    "footwork_dict_id": str(footwork_dict_id),
+                    "duration_minutes": "35",
+                    "set_count": "6",
                     "training_note": "precision footwork note",
                 },
             ),
             follow_redirects=True,
         )
 
-        records = get_training_records()
         assert create_response.status_code == 200
-        assert len(records) == len(original_records) + 1
-        record_id = records[-1]["id"]
-        assert records[-1]["athlete_id"] == 3
-
-        filtered_response = client.get(
-            "/training/records"
-            "?athlete_id=3"
-            "&start_date=2026-07-01"
-            "&end_date=2026-07-31"
-            "&footwork_type=cross_step"
-            "&stroke_technique=smash"
-            "&intensity=high"
-            "&minutes_min=30"
-            "&minutes_max=40"
-            "&keyword=precision"
-        )
-        filtered_body = filtered_response.get_data(as_text=True)
-
-        assert filtered_response.status_code == 200
-        assert "precision footwork note" in filtered_body
-        assert "2026-07-08" in filtered_body
-
-        edit_page = client.get(f"/training/batch-import?edit_id={record_id}")
-        assert edit_page.status_code == 200
-        assert "precision footwork note" in edit_page.get_data(as_text=True)
+        assert len(FOOTWORK_TRAINING_RECORDS) == len(original_records) + 1
+        record_id = FOOTWORK_TRAINING_RECORDS[-1]["id"]
+        assert FOOTWORK_TRAINING_RECORDS[-1]["athlete_id"] == 3
 
         edit_response = client.post(
-            f"/training/records/{record_id}/edit",
+            f"/training/footwork/{record_id}/edit",
             data=csrf_data(
                 client,
                 {
                     "athlete_id": "3",
                     "training_date": "2026-07-09",
-                    "footwork_type": "composite",
-                    "stroke_technique": "serve_receive",
-                    "multi_ball_minutes": "45",
-                    "intensity": "medium",
-                    "training_note": "updated record note",
+                    "footwork_dict_id": str(find_dict_by_code("composite_step")["id"]),
+                    "duration_minutes": "45",
+                    "set_count": "8",
+                    "training_note": "updated footwork note",
                 },
             ),
             follow_redirects=True,
         )
 
         assert edit_response.status_code == 200
-        assert records[-1]["training_date"] == "2026-07-09"
-        assert records[-1]["multi_ball_minutes"] == 45
+        assert FOOTWORK_TRAINING_RECORDS[-1]["training_date"] == "2026-07-09"
+        assert FOOTWORK_TRAINING_RECORDS[-1]["duration_minutes"] == 45
 
         delete_response = client.post(
-            f"/training/records/{record_id}/delete",
+            f"/training/footwork/{record_id}/delete",
             data=csrf_data(client),
             follow_redirects=True,
         )
 
         assert delete_response.status_code == 200
-        assert all(record["id"] != record_id for record in get_training_records())
+        assert all(record["id"] != record_id for record in FOOTWORK_TRAINING_RECORDS)
+
+        filtered_response = client.get(
+            "/training/footwork"
+            "?athlete_id=3"
+            "&start_date=2026-07-01"
+            "&end_date=2026-07-31"
+            "&keyword=precision"
+        )
+        filtered_body = filtered_response.get_data(as_text=True)
+        assert filtered_response.status_code == 200
+        assert "筛选条件" in filtered_body
+        assert "记录列表" in filtered_body
     finally:
-        records = get_training_records()
-        records[:] = original_records
+        FOOTWORK_TRAINING_RECORDS[:] = original_records
 
 
-def test_training_record_form_uses_current_player_list():
+def test_technique_tactic_training_supports_form_list_and_filters():
+    original_records = deepcopy(TECHNIQUE_TACTIC_TRAINING_RECORDS)
+    try:
+        client = app.test_client()
+        login(client)
+        technique_dict_id = find_dict_by_code("forehand_smash")["id"]
+        near_left_id = find_dict_by_code("near_left")["id"]
+
+        create_response = client.post(
+            "/training/technique-tactic",
+            data=csrf_data(
+                client,
+                {
+                    "athlete_id": "3",
+                    "training_date": "2026-07-08",
+                    "technique_dict_id": str(technique_dict_id),
+                    "multi_ball_count": "400",
+                    "serve_frequency": "高",
+                    "plan_execution_rate": "88",
+                    "on_table_rate": "82",
+                    f"landing_concentration_{near_left_id}": "较为集中",
+                    "qualitative_comment": "precision tactic note",
+                },
+            ),
+            follow_redirects=True,
+        )
+
+        body = create_response.get_data(as_text=True)
+        assert create_response.status_code == 200
+        assert len(TECHNIQUE_TACTIC_TRAINING_RECORDS) == len(original_records) + 1
+        assert "近台左侧（较为集中）" in body
+
+        filtered_response = client.get(
+            "/training/technique-tactic"
+            "?athlete_id=3"
+            "&start_date=2026-07-01"
+            "&end_date=2026-07-31"
+            "&serve_frequency=高"
+            "&keyword=precision"
+        )
+        filtered_body = filtered_response.get_data(as_text=True)
+        assert filtered_response.status_code == 200
+        assert "precision tactic note" in filtered_body
+    finally:
+        TECHNIQUE_TACTIC_TRAINING_RECORDS[:] = original_records
+
+
+def test_footwork_form_uses_current_player_list():
     client = app.test_client()
     login(client)
 
-    response = client.get("/training/batch-import")
+    response = client.get("/training/footwork")
     body = response.get_data(as_text=True)
 
     assert response.status_code == 200
     assert PLAYERS[-1]["name"] in body
+    assert "步法训练" in body
 
 
-def test_training_record_list_supports_pagination_with_filters():
-    original_records = deepcopy(get_training_records())
+def test_technique_tactic_list_supports_pagination_with_filters():
+    original_records = deepcopy(TECHNIQUE_TACTIC_TRAINING_RECORDS)
     try:
-        records = get_training_records()
-        records[:] = []
+        TECHNIQUE_TACTIC_TRAINING_RECORDS[:] = []
+        technique_dict_id = find_dict_by_code("forehand_smash")["id"]
+        mid_table_id = find_dict_by_code("mid_table")["id"]
         for index in range(12):
-            records.append(
+            TECHNIQUE_TACTIC_TRAINING_RECORDS.append(
                 {
                     "id": index + 1,
                     "athlete_id": PLAYERS[0]["id"],
                     "athlete_name": PLAYERS[0]["name"],
                     "training_date": f"2026-07-{index + 1:02d}",
-                    "footwork_type": "cross_step",
-                    "stroke_technique": "smash",
-                    "multi_ball_minutes": 30 + index,
-                    "intensity": "high",
-                    "note": f"pagination note {index + 1}",
+                    "technique_dict_id": technique_dict_id,
+                    "multi_ball_count": 300 + index,
+                    "serve_frequency": "高",
+                    "plan_execution_rate": 80 + index,
+                    "on_table_rate": 75 + index,
+                    "landing_distribution_items": [{"landing_dict_id": mid_table_id, "concentration": "较为集中"}],
+                    "landing_distribution": "中台（较为集中）",
+                    "qualitative_comment": f"pagination note {index + 1}",
                     "created_by": "admin",
                 }
             )
 
         client = app.test_client()
         login(client)
-        response = client.get("/training/records?intensity=high&page=2")
+        response = client.get("/training/technique-tactic?serve_frequency=高&page=2")
         body = response.get_data(as_text=True)
 
         assert response.status_code == 200
         assert "pagination note 2" in body
         assert "pagination note 12" not in body
         assert "第 2 / 2 页" in body
-        assert "page=1" in body
-        assert "intensity=high" in body
     finally:
-        records = get_training_records()
-        records[:] = original_records
+        TECHNIQUE_TACTIC_TRAINING_RECORDS[:] = original_records
 
 
-def test_skill_excel_import_accepts_player_name_and_student_no():
-    original_records = deepcopy(get_training_records())
+def test_footwork_excel_import_accepts_new_template():
+    original_records = deepcopy(FOOTWORK_TRAINING_RECORDS)
     try:
         client = app.test_client()
         login(client)
 
         workbook = openpyxl.Workbook()
         sheet = workbook.active
-        sheet.append(["运动员编号或姓名", "训练日期", "步法类型", "击球技术", "多球时长", "训练强度", "备注"])
-        sheet.append([PLAYERS[0]["name"], "2026-07-10", "交叉步", "扣杀", 30, "高强度", "name import"])
-        sheet.append([PLAYERS[1]["student_no"], "2026-07-11", "综合步法", "发接发", 35, "中强度", "student import"])
+        sheet.append(["运动员学号", "训练日期", "步法类型", "训练时长(分钟)", "训练组数", "训练备注"])
+        sheet.append([PLAYERS[0]["student_no"], "2026-07-10", "交叉步", 30, 5, "student import"])
+        sheet.append([PLAYERS[1]["student_no"], "2026-07-11", "综合步法", 35, 6, "second import"])
         payload = io.BytesIO()
         workbook.save(payload)
         payload.seek(0)
 
         response = client.post(
-            "/training/records/import-excel",
-            data=csrf_data(
-                client,
-                {"training_excel": (payload, "skill_import.xlsx")},
-            ),
+            "/training/footwork/import-excel",
+            data=csrf_data(client, {"training_excel": (payload, "footwork_import.xlsx")}),
             content_type="multipart/form-data",
             follow_redirects=True,
         )
 
         body = response.get_data(as_text=True)
-        records = get_training_records()
-
         assert response.status_code == 200
-        assert "成功导入 2 条专项技术记录" in body
-        assert len(records) == len(original_records) + 2
-        assert records[-2]["athlete_id"] == PLAYERS[0]["id"]
-        assert records[-1]["athlete_id"] == PLAYERS[1]["id"]
+        assert "成功导入 2 条步法训练记录" in body
+        assert len(FOOTWORK_TRAINING_RECORDS) == len(original_records) + 2
     finally:
-        records = get_training_records()
-        records[:] = original_records
+        FOOTWORK_TRAINING_RECORDS[:] = original_records
 
 
-def test_skill_excel_import_creates_player_archive_for_new_names():
-    original_players = deepcopy(app_module.PLAYERS)
-    original_records = deepcopy(get_training_records())
+def test_footwork_excel_import_skips_duplicate_rows():
+    original_records = deepcopy(FOOTWORK_TRAINING_RECORDS)
     try:
         client = app.test_client()
         login(client)
 
         workbook = openpyxl.Workbook()
         sheet = workbook.active
-        sheet.append(["运动员名称", "训练日期", "步法类型", "击球技术", "多球时长", "训练强度", "备注"])
-        sheet.append(["小明", "2026-06-06", "单步", "正手弧圈", 104, "高强度", "new player import"])
-        payload = io.BytesIO()
-        workbook.save(payload)
-        payload.seek(0)
-
-        response = client.post(
-            "/training/records/import-excel",
-            data=csrf_data(
-                client,
-                {"training_excel": (payload, "skill_import_new_player.xlsx")},
-            ),
-            content_type="multipart/form-data",
-            follow_redirects=True,
-        )
-
-        body = response.get_data(as_text=True)
-        records = get_training_records()
-        created_player = next((player for player in app_module.PLAYERS if player["name"] == "小明"), None)
-
-        assert response.status_code == 200
-        assert "成功导入 1 条专项技术记录" in body
-        assert created_player is not None
-        assert created_player["student_no"].startswith("IMP")
-        assert len(records) == len(original_records) + 1
-        assert records[-1]["athlete_id"] == created_player["id"]
-        assert records[-1]["athlete_name"] == "小明"
-    finally:
-        app_module.PLAYERS[:] = original_players
-        records = get_training_records()
-        records[:] = original_records
-
-
-def test_skill_excel_import_skips_existing_records():
-    original_records = deepcopy(get_training_records())
-    try:
-        client = app.test_client()
-        login(client)
-
-        workbook = openpyxl.Workbook()
-        sheet = workbook.active
-        sheet.append(["运动员编号或姓名", "训练日期", "步法类型", "击球技术", "多球时长", "训练强度", "备注"])
-        sheet.append([PLAYERS[0]["name"], "2026-07-10", "交叉步", "扣杀", 30, "高强度", "existing import"])
-        payload = io.BytesIO()
-        workbook.save(payload)
-        payload_bytes = payload.getvalue()
-
-        first_response = client.post(
-            "/training/records/import-excel",
-            data=csrf_data(client, {"training_excel": (io.BytesIO(payload_bytes), "skill_import.xlsx")}),
-            content_type="multipart/form-data",
-            follow_redirects=True,
-        )
-        assert first_response.status_code == 200
-        assert len(get_training_records()) == len(original_records) + 1
-
-        second_response = client.post(
-            "/training/records/import-excel",
-            data=csrf_data(client, {"training_excel": (io.BytesIO(payload_bytes), "skill_import.xlsx")}),
-            content_type="multipart/form-data",
-            follow_redirects=True,
-        )
-
-        body = second_response.get_data(as_text=True)
-        assert second_response.status_code == 200
-        assert len(get_training_records()) == len(original_records) + 1
-        assert "重复专项技术记录已跳过" in body
-    finally:
-        records = get_training_records()
-        records[:] = original_records
-
-
-def test_skill_excel_import_skips_duplicate_rows_in_same_file():
-    original_records = deepcopy(get_training_records())
-    try:
-        client = app.test_client()
-        login(client)
-
-        workbook = openpyxl.Workbook()
-        sheet = workbook.active
-        sheet.append(["运动员编号或姓名", "训练日期", "步法类型", "击球技术", "多球时长", "训练强度", "备注"])
-        duplicate_row = [PLAYERS[0]["name"], "2026-07-10", "交叉步", "扣杀", 30, "高强度", "same file duplicate"]
+        sheet.append(["运动员学号", "训练日期", "步法类型", "训练时长(分钟)", "训练组数", "训练备注"])
+        duplicate_row = [PLAYERS[0]["student_no"], "2026-07-10", "交叉步", 30, 5, "same file duplicate"]
         sheet.append(duplicate_row)
         sheet.append(duplicate_row)
         payload = io.BytesIO()
@@ -288,16 +231,15 @@ def test_skill_excel_import_skips_duplicate_rows_in_same_file():
         payload.seek(0)
 
         response = client.post(
-            "/training/records/import-excel",
-            data=csrf_data(client, {"training_excel": (payload, "skill_import.xlsx")}),
+            "/training/footwork/import-excel",
+            data=csrf_data(client, {"training_excel": (payload, "footwork_import.xlsx")}),
             content_type="multipart/form-data",
             follow_redirects=True,
         )
 
         body = response.get_data(as_text=True)
         assert response.status_code == 200
-        assert len(get_training_records()) == len(original_records) + 1
-        assert "第 3 行：重复专项技术记录已跳过" in body
+        assert len(FOOTWORK_TRAINING_RECORDS) == len(original_records) + 1
+        assert "第 3 行：重复步法训练记录已跳过" in body
     finally:
-        records = get_training_records()
-        records[:] = original_records
+        FOOTWORK_TRAINING_RECORDS[:] = original_records

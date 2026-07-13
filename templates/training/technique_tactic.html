@@ -1,0 +1,364 @@
+{% extends "base.html" %}
+
+{% block title %}技战术训练 - 乒乓球运动员综合训练监控管理系统{% endblock %}
+
+{% block content %}
+<div class="d-flex flex-column flex-md-row align-items-md-center justify-content-between gap-3 mb-4">
+    <div>
+        <h1 class="page-title h3 mb-1">技战术训练</h1>
+        <p class="text-secondary mb-0">打通计划执行与效果评估业务闭环，严格区分定量与定性指标。</p>
+    </div>
+    <div class="d-flex gap-2">
+        <a href="{{ url_for('training.export_technique_tactic', **request.args) }}" class="btn btn-outline-success">导出记录</a>
+        <a href="{{ url_for('training.footwork') }}" class="btn btn-outline-primary">步法训练</a>
+    </div>
+</div>
+
+<div class="card shadow-sm mb-4">
+    <div class="card-header bg-white border-0 pt-4 px-4">
+        <h2 class="h5 mb-1">{% if editing_record %}修改技战术训练记录{% else %}新增技战术训练记录{% endif %}</h2>
+        <p class="text-secondary small mb-0">表单分为「执行记录」与「效果反馈」两大区块，量化与定性指标独立填写。</p>
+    </div>
+    <div class="card-body">
+        <form method="post"
+              action="{% if editing_record %}{{ url_for('training.edit_technique_tactic', record_id=editing_record.id) }}{% else %}{{ url_for('training.technique_tactic') }}{% endif %}"
+              class="row g-4">
+            <div class="col-12">
+                <section class="p-3 rounded border border-primary-subtle bg-primary-subtle bg-opacity-10">
+                    <h3 class="h6 text-primary mb-3">执行记录（考核执行层面）</h3>
+                    <div class="row g-3">
+                        <div class="col-12 col-md-4">
+                            <label for="athlete_id" class="form-label">运动员</label>
+                            <select class="form-select" id="athlete_id" name="athlete_id" required>
+                                <option value="">请选择运动员</option>
+                                {% for athlete in athletes %}
+                                    <option value="{{ athlete.id }}" {% if editing_record and editing_record.athlete_id == athlete.id %}selected{% endif %}>
+                                        {{ athlete.name }}（{{ athlete.student_no }}）
+                                    </option>
+                                {% endfor %}
+                            </select>
+                        </div>
+                        <div class="col-12 col-md-4">
+                            <label for="training_date" class="form-label">训练日期</label>
+                            <input type="date" class="form-control" id="training_date" name="training_date"
+                                   value="{{ editing_record.training_date if editing_record else '' }}" required>
+                        </div>
+                        <div class="col-12 col-md-4">
+                            <label for="technique_category_id" class="form-label">技战术大类</label>
+                            <select class="form-select" id="technique_category_id" required>
+                                <option value="">请选择大类</option>
+                                {% for category in technique_categories %}
+                                    <option value="{{ category.id }}" {% if editing_record and editing_record.technique_category_id == category.id %}selected{% endif %}>{{ category.dict_name }}</option>
+                                {% endfor %}
+                            </select>
+                        </div>
+                        <div class="col-12 col-md-4">
+                            <label for="technique_dict_id" class="form-label">技战术选择</label>
+                            <select class="form-select" id="technique_dict_id" name="technique_dict_id" required>
+                                <option value="">请先选择大类</option>
+                                {% for item in technique_options %}
+                                    <option value="{{ item.id }}" data-parent="{{ item.parent_id }}"
+                                            {% if editing_record and editing_record.technique_dict_id == item.id %}selected{% endif %}>{{ item.dict_name }}</option>
+                                {% endfor %}
+                            </select>
+                        </div>
+                        <div class="col-12 col-md-4">
+                            <label for="multi_ball_count" class="form-label">多球训练球数</label>
+                            <input type="number" class="form-control" id="multi_ball_count" name="multi_ball_count"
+                                   min="0" max="5000" step="1"
+                                   value="{{ editing_record.multi_ball_count if editing_record else '' }}" required>
+                        </div>
+                        <div class="col-12 col-md-4">
+                            <label for="serve_frequency" class="form-label">发球频率</label>
+                            <select class="form-select" id="serve_frequency" name="serve_frequency" required>
+                                {% for option in serve_frequency_options %}
+                                    <option value="{{ option }}" {% if editing_record and editing_record.serve_frequency == option %}selected{% elif not editing_record and option == '中' %}selected{% endif %}>{{ option }}</option>
+                                {% endfor %}
+                            </select>
+                        </div>
+                        <div class="col-12 col-md-6">
+                            <label for="plan_execution_rate" class="form-label">计划执行率（%）</label>
+                            <input type="range" class="form-range" id="plan_execution_rate_range" min="0" max="100" step="1"
+                                   value="{{ editing_record.plan_execution_rate if editing_record else 0 }}">
+                            <div class="input-group">
+                                <input type="number" class="form-control" id="plan_execution_rate" name="plan_execution_rate"
+                                       min="0" max="100" step="0.1"
+                                       value="{{ editing_record.plan_execution_rate if editing_record else 0 }}" required>
+                                <span class="input-group-text">%</span>
+                            </div>
+                        </div>
+                    </div>
+                </section>
+            </div>
+
+            <div class="col-12">
+                <section class="p-3 rounded border border-success-subtle bg-success-subtle bg-opacity-10">
+                    <h3 class="h6 text-success mb-3">效果反馈（考核真实训练效果）</h3>
+                    <div class="row g-3">
+                        <div class="col-12 col-md-6">
+                            <label for="on_table_rate" class="form-label">上台率（量化）</label>
+                            <input type="range" class="form-range" id="on_table_rate_range" min="0" max="100" step="1"
+                                   value="{{ editing_record.on_table_rate if editing_record and editing_record.on_table_rate is not none else 0 }}">
+                            <div class="input-group">
+                                <input type="number" class="form-control" id="on_table_rate" name="on_table_rate"
+                                       min="0" max="100" step="0.1"
+                                       value="{{ editing_record.on_table_rate if editing_record and editing_record.on_table_rate is not none else '' }}">
+                                <span class="input-group-text">%</span>
+                            </div>
+                        </div>
+                        <div class="col-12">
+                            <label class="form-label">落点分布（定性）</label>
+                            <div class="table-responsive border rounded">
+                                <table class="table table-sm align-middle mb-0">
+                                    <thead class="table-light">
+                                        <tr>
+                                            <th style="width: 40%;">落点区域</th>
+                                            <th>集中程度</th>
+                                        </tr>
+                                    </thead>
+                                    <tbody>
+                                        {% for item in landing_options %}
+                                        <tr>
+                                            <td class="fw-semibold">{{ item.dict_name }}</td>
+                                            <td>
+                                                <select class="form-select form-select-sm" name="landing_concentration_{{ item.id }}">
+                                                    <option value="">不记录</option>
+                                                    {% for level in landing_concentration_options %}
+                                                        <option value="{{ level }}"
+                                                            {% if editing_record and editing_record.landing_distribution_map.get(item.id) == level %}selected{% endif %}>
+                                                            {{ level }}
+                                                        </option>
+                                                    {% endfor %}
+                                                </select>
+                                            </td>
+                                        </tr>
+                                        {% endfor %}
+                                    </tbody>
+                                </table>
+                            </div>
+                            <div class="form-text">为实际出现的落点区域分别评估集中程度；未出现的区域可留空。</div>
+                        </div>
+                        <div class="col-12">
+                            <label for="qualitative_comment" class="form-label">主观文字打分 / 定性描述</label>
+                            <textarea class="form-control" id="qualitative_comment" name="qualitative_comment" rows="3"
+                                      placeholder="教练主观评价，与量化指标解耦">{{ editing_record.qualitative_comment if editing_record else '' }}</textarea>
+                        </div>
+                    </div>
+                </section>
+            </div>
+
+            <div class="col-12 d-flex justify-content-end gap-2">
+                {% if editing_record %}
+                    <a href="{{ url_for('training.technique_tactic') }}" class="btn btn-outline-secondary">取消修改</a>
+                {% else %}
+                    <button type="reset" class="btn btn-outline-secondary">重置</button>
+                {% endif %}
+                <button type="submit" class="btn btn-primary">{% if editing_record %}保存修改{% else %}保存记录{% endif %}</button>
+            </div>
+        </form>
+    </div>
+</div>
+
+<div class="card shadow-sm mb-4">
+    <div class="card-header bg-white border-0 pt-4 px-4">
+        <h2 class="h5 mb-1">筛选条件</h2>
+        <p class="text-secondary small mb-0">当前命中 {{ filtered_count }} 条记录，共 {{ total_count }} 条，启用 {{ active_condition_count }} 个查询条件。</p>
+    </div>
+    <div class="card-body">
+        <form method="get" action="{{ url_for('training.technique_tactic') }}" class="row g-3 align-items-end">
+            <div class="col-12 col-md-3">
+                <label for="filter_athlete_id" class="form-label">运动员</label>
+                <select class="form-select" id="filter_athlete_id" name="athlete_id">
+                    <option value="">全部运动员</option>
+                    {% for athlete in athletes %}
+                        <option value="{{ athlete.id }}" {% if request.args.get('athlete_id') == athlete.id|string %}selected{% endif %}>{{ athlete.name }}</option>
+                    {% endfor %}
+                </select>
+            </div>
+            <div class="col-12 col-md-3">
+                <label for="start_date" class="form-label">开始日期</label>
+                <input type="date" class="form-control" id="start_date" name="start_date" value="{{ request.args.get('start_date', '') }}">
+            </div>
+            <div class="col-12 col-md-3">
+                <label for="end_date" class="form-label">结束日期</label>
+                <input type="date" class="form-control" id="end_date" name="end_date" value="{{ request.args.get('end_date', '') }}">
+            </div>
+            <div class="col-12 col-md-3">
+                <label for="filter_technique_category_id" class="form-label">技战术大类</label>
+                <select class="form-select" id="filter_technique_category_id" name="technique_category_id">
+                    <option value="">全部大类</option>
+                    {% for category in technique_categories %}
+                        <option value="{{ category.id }}" {% if request.args.get('technique_category_id') == category.id|string %}selected{% endif %}>{{ category.dict_name }}</option>
+                    {% endfor %}
+                </select>
+            </div>
+            <div class="col-12 col-md-3">
+                <label for="filter_technique_dict_id" class="form-label">技战术</label>
+                <select class="form-select" id="filter_technique_dict_id" name="technique_dict_id">
+                    <option value="">{% if request.args.get('technique_category_id') %}全部技战术{% else %}请先选择大类{% endif %}</option>
+                    {% for item in technique_options %}
+                        <option value="{{ item.id }}" data-parent="{{ item.parent_id }}"
+                                {% if request.args.get('technique_dict_id') == item.id|string %}selected{% endif %}>{{ item.dict_name }}</option>
+                    {% endfor %}
+                </select>
+            </div>
+            <div class="col-12 col-md-3">
+                <label for="filter_serve_frequency" class="form-label">发球频率</label>
+                <select class="form-select" id="filter_serve_frequency" name="serve_frequency">
+                    <option value="">全部</option>
+                    {% for option in serve_frequency_options %}
+                        <option value="{{ option }}" {% if request.args.get('serve_frequency') == option %}selected{% endif %}>{{ option }}</option>
+                    {% endfor %}
+                </select>
+            </div>
+            <div class="col-12 col-md-5">
+                <label for="keyword" class="form-label">关键词</label>
+                <input type="text" class="form-control" id="keyword" name="keyword"
+                       value="{{ request.args.get('keyword', '') }}" placeholder="运动员、技战术、定性评价关键词">
+            </div>
+            <div class="col-12 d-flex gap-2">
+                <button type="submit" class="btn btn-primary">查询</button>
+                <a href="{{ url_for('training.technique_tactic') }}" class="btn btn-outline-secondary">重置</a>
+            </div>
+        </form>
+    </div>
+</div>
+
+<div class="card shadow-sm">
+    <div class="card-header bg-white d-flex justify-content-between align-items-center py-3">
+        <h2 class="h5 mb-0">记录列表</h2>
+        <span class="badge text-bg-secondary">本页 {{ records|length }} 条 / 命中 {{ filtered_count }} 条</span>
+    </div>
+    <div class="card-body p-0">
+        <div class="table-responsive">
+            <table class="table table-hover align-middle mb-0">
+                <thead class="table-light">
+                    <tr>
+                        <th>运动员</th>
+                        <th>训练日期</th>
+                        <th>技战术</th>
+                        <th>多球球数</th>
+                        <th>发球频率</th>
+                        <th>计划执行率</th>
+                        <th>上台率</th>
+                        <th>落点分布</th>
+                        <th>定性评价</th>
+                        <th class="text-end">操作</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for record in records %}
+                    <tr>
+                        <td>
+                            <div class="fw-semibold">{{ record.athlete_name }}</div>
+                            <div class="text-secondary small">{{ record.student_no }} · {{ record.level }}</div>
+                        </td>
+                        <td>{{ record.training_date }}</td>
+                        <td>
+                            <div class="small text-secondary">{{ record.technique_category_name }}</div>
+                            <div>{{ record.technique_name }}</div>
+                        </td>
+                        <td>{{ record.multi_ball_count }}</td>
+                        <td><span class="badge text-bg-secondary">{{ record.serve_frequency }}</span></td>
+                        <td>{{ record.plan_execution_rate }}%</td>
+                        <td>{{ record.on_table_rate if record.on_table_rate is not none else '-' }}{% if record.on_table_rate is not none %}%{% endif %}</td>
+                        <td class="small">{{ record.landing_distribution or '-' }}</td>
+                        <td class="small">{{ record.qualitative_comment or '-' }}</td>
+                        <td class="text-end text-nowrap">
+                            <a href="{{ url_for('training.technique_tactic', edit_id=record.id) }}" class="btn btn-sm btn-outline-primary">编辑</a>
+                            <form method="post" action="{{ url_for('training.delete_technique_tactic', record_id=record.id) }}" class="d-inline" onsubmit="return confirm('确认删除该技战术训练记录？');">
+                                <button type="submit" class="btn btn-sm btn-outline-danger">删除</button>
+                            </form>
+                        </td>
+                    </tr>
+                    {% else %}
+                    <tr>
+                        <td colspan="10" class="text-center text-secondary py-5">暂无技战术训练记录。</td>
+                    </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+    </div>
+    {% if pagination.total_pages > 1 %}
+    <div class="card-footer bg-white d-flex flex-column flex-md-row justify-content-between align-items-md-center gap-3">
+        <div class="text-secondary small">
+            显示第 {{ pagination.start }}-{{ pagination.end }} 条，共 {{ filtered_count }} 条；第 {{ pagination.page }} / {{ pagination.total_pages }} 页
+        </div>
+        <nav aria-label="技战术训练记录分页">
+            <ul class="pagination mb-0">
+                <li class="page-item {% if not pagination.has_prev %}disabled{% endif %}">
+                    <a class="page-link" href="{{ url_for('training.technique_tactic', page=pagination.prev_page, **pagination.args) }}">上一页</a>
+                </li>
+                {% for page_number in range(1, pagination.total_pages + 1) %}
+                    <li class="page-item {% if page_number == pagination.page %}active{% endif %}">
+                        <a class="page-link" href="{{ url_for('training.technique_tactic', page=page_number, **pagination.args) }}">{{ page_number }}</a>
+                    </li>
+                {% endfor %}
+                <li class="page-item {% if not pagination.has_next %}disabled{% endif %}">
+                    <a class="page-link" href="{{ url_for('training.technique_tactic', page=pagination.next_page, **pagination.args) }}">下一页</a>
+                </li>
+            </ul>
+        </nav>
+    </div>
+    {% endif %}
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+(function () {
+    function bindTechniqueCascade(categorySelect, techniqueSelect, emptyLabel, allLabel) {
+        if (!categorySelect || !techniqueSelect) return;
+        const allOptions = Array.from(techniqueSelect.querySelectorAll('option[data-parent]'));
+
+        function syncTechniqueOptions() {
+            const parentId = categorySelect.value;
+            const currentValue = techniqueSelect.value;
+            techniqueSelect.innerHTML = parentId
+                ? '<option value="">' + allLabel + '</option>'
+                : '<option value="">' + emptyLabel + '</option>';
+            if (!parentId) {
+                techniqueSelect.value = '';
+                return;
+            }
+            allOptions.forEach(function (option) {
+                if (option.dataset.parent === parentId) {
+                    techniqueSelect.appendChild(option.cloneNode(true));
+                }
+            });
+            if (currentValue) {
+                techniqueSelect.value = currentValue;
+            }
+        }
+
+        categorySelect.addEventListener('change', syncTechniqueOptions);
+        syncTechniqueOptions();
+    }
+
+    bindTechniqueCascade(
+        document.getElementById('technique_category_id'),
+        document.getElementById('technique_dict_id'),
+        '请先选择大类',
+        '请选择技战术'
+    );
+    bindTechniqueCascade(
+        document.getElementById('filter_technique_category_id'),
+        document.getElementById('filter_technique_dict_id'),
+        '请先选择大类',
+        '全部技战术'
+    );
+
+    function bindRange(rangeId, inputId) {
+        const range = document.getElementById(rangeId);
+        const input = document.getElementById(inputId);
+        if (!range || !input) return;
+        range.addEventListener('input', function () { input.value = range.value; });
+        input.addEventListener('input', function () { range.value = input.value || 0; });
+    }
+
+    bindRange('plan_execution_rate_range', 'plan_execution_rate');
+    bindRange('on_table_rate_range', 'on_table_rate');
+})();
+</script>
+{% endblock %}

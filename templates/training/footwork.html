@@ -1,0 +1,236 @@
+{% extends "base.html" %}
+
+{% block title %}步法训练 - 乒乓球运动员综合训练监控管理系统{% endblock %}
+
+{% block content %}
+<div class="d-flex flex-column flex-md-row align-items-md-center justify-content-between gap-3 mb-4">
+    <div>
+        <h1 class="page-title h3 mb-1">步法训练</h1>
+        <p class="text-secondary mb-0">记录运动员步法训练过程，侧重轻量化录入与过程管理。</p>
+    </div>
+    <a href="{{ url_for('training.technique_tactic') }}" class="btn btn-outline-primary">技战术训练</a>
+</div>
+
+<div class="row g-4">
+    <div class="col-12 col-xl-7">
+        <div class="card shadow-sm h-100">
+            <div class="card-header bg-white border-0 pt-4 px-4">
+                <h2 class="h5 mb-1">{% if editing_record %}修改步法训练记录{% else %}新增步法训练记录{% endif %}</h2>
+                <p class="text-secondary small mb-0">录入单次步法训练的核心过程数据。</p>
+            </div>
+            <div class="card-body">
+                <form method="post"
+                      action="{% if editing_record %}{{ url_for('training.edit_footwork', record_id=editing_record.id) }}{% else %}{{ url_for('training.footwork') }}{% endif %}"
+                      class="row g-3">
+                    <div class="col-12 col-md-6">
+                        <label for="athlete_id" class="form-label">运动员</label>
+                        <select class="form-select" id="athlete_id" name="athlete_id" required>
+                            <option value="">请选择运动员</option>
+                            {% for athlete in athletes %}
+                                <option value="{{ athlete.id }}" {% if editing_record and editing_record.athlete_id == athlete.id %}selected{% endif %}>
+                                    {{ athlete.name }}（{{ athlete.student_no }}）
+                                </option>
+                            {% endfor %}
+                        </select>
+                    </div>
+
+                    <div class="col-12 col-md-6">
+                        <label for="training_date" class="form-label">训练日期</label>
+                        <input type="date" class="form-control" id="training_date" name="training_date"
+                               value="{{ editing_record.training_date if editing_record else '' }}" required>
+                    </div>
+
+                    <div class="col-12 col-md-6">
+                        <label for="footwork_dict_id" class="form-label">步法类型</label>
+                        <select class="form-select" id="footwork_dict_id" name="footwork_dict_id" required>
+                            <option value="">请选择步法类型</option>
+                            {% for item in footwork_options %}
+                                <option value="{{ item.id }}" {% if editing_record and editing_record.footwork_dict_id == item.id %}selected{% endif %}>{{ item.dict_name }}</option>
+                            {% endfor %}
+                        </select>
+                    </div>
+
+                    <div class="col-12 col-md-6">
+                        <label for="duration_minutes" class="form-label">训练时长（分钟）</label>
+                        <input type="number" class="form-control" id="duration_minutes" name="duration_minutes"
+                               min="1" max="300" step="1"
+                               value="{{ editing_record.duration_minutes if editing_record else '' }}" required>
+                    </div>
+
+                    <div class="col-12 col-md-6">
+                        <label for="set_count" class="form-label">训练组数</label>
+                        <input type="number" class="form-control" id="set_count" name="set_count"
+                               min="1" max="100" step="1"
+                               value="{{ editing_record.set_count if editing_record else '' }}" required>
+                    </div>
+
+                    <div class="col-12">
+                        <label for="training_note" class="form-label">训练备注</label>
+                        <textarea class="form-control" id="training_note" name="training_note" rows="4" maxlength="500"
+                                  placeholder="记录技术问题、教练建议等定性描述">{{ editing_record.note if editing_record else '' }}</textarea>
+                    </div>
+
+                    <div class="col-12 d-flex justify-content-end gap-2">
+                        {% if editing_record %}
+                            <a href="{{ url_for('training.footwork') }}" class="btn btn-outline-secondary">取消修改</a>
+                        {% else %}
+                            <button type="reset" class="btn btn-outline-secondary">重置</button>
+                        {% endif %}
+                        <button type="submit" class="btn btn-primary">{% if editing_record %}保存修改{% else %}保存记录{% endif %}</button>
+                    </div>
+                </form>
+            </div>
+        </div>
+    </div>
+
+    <div class="col-12 col-xl-5">
+        <div class="card shadow-sm mb-4">
+            <div class="card-header bg-white border-0 pt-4 px-4">
+                <h2 class="h5 mb-1">Excel 批量导入</h2>
+                <p class="text-secondary small mb-0">上传月度步法训练记录，系统会逐行校验后导入。</p>
+            </div>
+            <div class="card-body">
+                <form method="post" action="{{ url_for('training.import_footwork_excel') }}" enctype="multipart/form-data">
+                    <div class="mb-3">
+                        <label for="training_excel" class="form-label">选择 Excel 文件</label>
+                        <input class="form-control" type="file" id="training_excel" name="training_excel"
+                               accept=".xls,.xlsx" required>
+                    </div>
+
+                    <div class="alert alert-info mb-3" role="alert">
+                        表头顺序：运动员学号、训练日期、步法类型、训练时长(分钟)、训练组数、训练备注。
+                    </div>
+
+                    <div class="d-grid">
+                        <button type="submit" class="btn btn-primary">上传并校验</button>
+                    </div>
+                </form>
+            </div>
+        </div>
+
+        <div class="alert alert-warning shadow-sm" role="alert">
+            <div class="fw-semibold mb-1">数据校验规则</div>
+            <div class="small">
+                训练日期必须是 YYYY-MM-DD；训练时长 1-300 分钟；训练组数 1-100 组；步法类型必须匹配系统字典。
+            </div>
+        </div>
+    </div>
+</div>
+
+<div class="card shadow-sm mb-4">
+    <div class="card-header bg-white border-0 pt-4 px-4">
+        <h2 class="h5 mb-1">筛选条件</h2>
+        <p class="text-secondary small mb-0">当前命中 {{ filtered_count }} 条记录，共 {{ total_count }} 条，启用 {{ active_condition_count }} 个查询条件。</p>
+    </div>
+    <div class="card-body">
+        <form method="get" action="{{ url_for('training.footwork') }}" class="row g-3 align-items-end">
+            <div class="col-12 col-md-3">
+                <label for="filter_athlete_id" class="form-label">运动员</label>
+                <select class="form-select" id="filter_athlete_id" name="athlete_id">
+                    <option value="">全部运动员</option>
+                    {% for athlete in athletes %}
+                        <option value="{{ athlete.id }}" {% if request.args.get('athlete_id') == athlete.id|string %}selected{% endif %}>{{ athlete.name }}</option>
+                    {% endfor %}
+                </select>
+            </div>
+            <div class="col-12 col-md-3">
+                <label for="start_date" class="form-label">开始日期</label>
+                <input type="date" class="form-control" id="start_date" name="start_date" value="{{ request.args.get('start_date', '') }}">
+            </div>
+            <div class="col-12 col-md-3">
+                <label for="end_date" class="form-label">结束日期</label>
+                <input type="date" class="form-control" id="end_date" name="end_date" value="{{ request.args.get('end_date', '') }}">
+            </div>
+            <div class="col-12 col-md-3">
+                <label for="filter_footwork_dict_id" class="form-label">步法类型</label>
+                <select class="form-select" id="filter_footwork_dict_id" name="footwork_dict_id">
+                    <option value="">全部步法</option>
+                    {% for item in footwork_options %}
+                        <option value="{{ item.id }}" {% if request.args.get('footwork_dict_id') == item.id|string %}selected{% endif %}>{{ item.dict_name }}</option>
+                    {% endfor %}
+                </select>
+            </div>
+            <div class="col-12 col-md-8">
+                <label for="keyword" class="form-label">关键词</label>
+                <input type="text" class="form-control" id="keyword" name="keyword"
+                       value="{{ request.args.get('keyword', '') }}" placeholder="运动员、步法类型、备注关键词">
+            </div>
+            <div class="col-12 d-flex gap-2">
+                <button type="submit" class="btn btn-primary">查询</button>
+                <a href="{{ url_for('training.footwork') }}" class="btn btn-outline-secondary">重置</a>
+            </div>
+        </form>
+    </div>
+</div>
+
+<div class="card shadow-sm">
+    <div class="card-header bg-white d-flex justify-content-between align-items-center py-3">
+        <h2 class="h5 mb-0">记录列表</h2>
+        <span class="badge text-bg-secondary">本页 {{ records|length }} 条 / 命中 {{ filtered_count }} 条</span>
+    </div>
+    <div class="card-body p-0">
+        <div class="table-responsive">
+            <table class="table table-hover align-middle mb-0">
+                <thead class="table-light">
+                    <tr>
+                        <th>运动员</th>
+                        <th>训练日期</th>
+                        <th>步法类型</th>
+                        <th>训练时长</th>
+                        <th>训练组数</th>
+                        <th>备注</th>
+                        <th class="text-end">操作</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for record in records %}
+                    <tr>
+                        <td>
+                            <div class="fw-semibold">{{ record.athlete_name }}</div>
+                            <div class="text-secondary small">{{ record.student_no }} · {{ record.level }}</div>
+                        </td>
+                        <td>{{ record.training_date }}</td>
+                        <td>{{ record.footwork_type_name }}</td>
+                        <td>{{ record.duration_minutes }} 分钟</td>
+                        <td>{{ record.set_count }} 组</td>
+                        <td class="small">{{ record.note or '-' }}</td>
+                        <td class="text-end text-nowrap">
+                            <a href="{{ url_for('training.footwork', edit_id=record.id, **pagination.args) }}" class="btn btn-sm btn-outline-primary">编辑</a>
+                            <form method="post" action="{{ url_for('training.delete_footwork', record_id=record.id) }}" class="d-inline" onsubmit="return confirm('确认删除该步法训练记录？');">
+                                <button type="submit" class="btn btn-sm btn-outline-danger">删除</button>
+                            </form>
+                        </td>
+                    </tr>
+                    {% else %}
+                    <tr>
+                        <td colspan="7" class="text-center text-secondary py-5">暂无步法训练记录。</td>
+                    </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+    </div>
+    {% if pagination.total_pages > 1 %}
+    <div class="card-footer bg-white d-flex flex-column flex-md-row justify-content-between align-items-md-center gap-3">
+        <div class="text-secondary small">
+            显示第 {{ pagination.start }}-{{ pagination.end }} 条，共 {{ filtered_count }} 条；第 {{ pagination.page }} / {{ pagination.total_pages }} 页
+        </div>
+        <nav aria-label="步法训练记录分页">
+            <ul class="pagination mb-0">
+                <li class="page-item {% if not pagination.has_prev %}disabled{% endif %}">
+                    <a class="page-link" href="{{ url_for('training.footwork', page=pagination.prev_page, **pagination.args) }}">上一页</a>
+                </li>
+                {% for page_number in range(1, pagination.total_pages + 1) %}
+                    <li class="page-item {% if page_number == pagination.page %}active{% endif %}">
+                        <a class="page-link" href="{{ url_for('training.footwork', page=page_number, **pagination.args) }}">{{ page_number }}</a>
+                    </li>
+                {% endfor %}
+                <li class="page-item {% if not pagination.has_next %}disabled{% endif %}">
+                    <a class="page-link" href="{{ url_for('training.footwork', page=pagination.next_page, **pagination.args) }}">下一页</a>
+                </li>
+            </ul>
+        </nav>
+    </div>
+    {% endif %}
+</div>
+{% endblock %}

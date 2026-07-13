@@ -149,7 +149,7 @@ def test_training_plan_excel_import_rejects_skill_record_template():
         body = response.get_data(as_text=True)
         assert response.status_code == 200
         assert len(app_module.TRAINING_PLANS) == len(original_plans)
-        assert "该文件是专项技术记录模板" in body
+        assert "该文件是步法训练记录模板" in body
         assert "30 个错误" not in body
     finally:
         app_module.TRAINING_PLANS[:] = original_plans
