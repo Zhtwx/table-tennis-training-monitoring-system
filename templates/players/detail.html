@@ -32,6 +32,14 @@
                     <dt class="col-5 text-secondary">主打法</dt><dd class="col-7">{{ player.play_style or '-' }}</dd>
                     <dt class="col-5 text-secondary">握拍方式</dt><dd class="col-7">{{ player.grip or '-' }}</dd>
                     <dt class="col-5 text-secondary">联系电话</dt><dd class="col-7">{{ player.contact_phone or '-' }}</dd>
+                    <dt class="col-5 text-secondary">主教练</dt>
+                    <dd class="col-7">
+                        {% if player.coach_id and player.coach_name %}
+                            <a href="{{ url_for('coaches.coach_players', id=player.coach_id) }}">{{ player.coach_name }}</a>
+                        {% else %}
+                            -
+                        {% endif %}
+                    </dd>
                     <dt class="col-5 text-secondary">伤病状态</dt><dd class="col-7">{{ player.injury_status }}</dd>
                 </dl>
             </div>

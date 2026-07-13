@@ -1,6 +1,6 @@
 from copy import deepcopy
 
-from app import PLAYERS, app
+from app import COACHES, PLAYERS, app
 from tests.helpers import csrf_data
 
 
@@ -23,9 +23,19 @@ def player_payload(**overrides):
         "grip": "右手横板",
         "contact_phone": "13800009999",
         "injury_status_code": "healthy",
+        "coach_id": "1",
     }
     data.update(overrides)
     return data
+
+
+def test_seed_players_have_primary_coach_fields():
+    coach_names = {coach["id"]: coach["name"] for coach in COACHES}
+
+    assert PLAYERS
+    for player in PLAYERS:
+        assert player.get("coach_id") in coach_names
+        assert player.get("coach_name") == coach_names[player["coach_id"]]
 
 
 def test_admin_can_create_view_edit_delete_player_and_filter():
@@ -45,6 +55,8 @@ def test_admin_can_create_view_edit_delete_player_and_filter():
         created = PLAYERS[-1]
         assert created["student_no"] == "2026999"
         assert created["name"] == "测试队员"
+        assert created["coach_id"] == 1
+        assert created["coach_name"] == "张教练"
 
         detail_response = client.get(f"/players/{created['id']}")
         detail_body = detail_response.get_data(as_text=True)
@@ -52,11 +64,13 @@ def test_admin_can_create_view_edit_delete_player_and_filter():
         assert detail_response.status_code == 200
         assert "测试队员" in detail_body
         assert "右手横板快攻" in detail_body
+        assert "主教练" in detail_body
+        assert "张教练" in detail_body
 
         filter_response = client.get(
             "/players/?student_no=2026999&name=测试&gender=男"
             "&level=first&play_style=横板&injury_status=healthy"
-            "&age_min=17&age_max=19"
+            "&age_min=17&age_max=19&coach_id=1"
         )
         filter_body = filter_response.get_data(as_text=True)
 
@@ -67,7 +81,7 @@ def test_admin_can_create_view_edit_delete_player_and_filter():
             f"/players/{created['id']}/edit",
             data=csrf_data(
                 client,
-                player_payload(name="测试队员改", age="19", level_code="second"),
+                player_payload(name="测试队员改", age="19", level_code="second", coach_id="2"),
             ),
             follow_redirects=True,
         )
@@ -76,6 +90,8 @@ def test_admin_can_create_view_edit_delete_player_and_filter():
         assert PLAYERS[-1]["name"] == "测试队员改"
         assert PLAYERS[-1]["age"] == 19
         assert PLAYERS[-1]["level_code"] == "second"
+        assert PLAYERS[-1]["coach_id"] == 2
+        assert PLAYERS[-1]["coach_name"] == "李教练"
 
         delete_response = client.post(
             f"/players/{created['id']}/delete",

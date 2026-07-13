@@ -123,11 +123,14 @@
                         <td class="text-end pe-4">
                             <div class="btn-group btn-group-sm" role="group" aria-label="教练员操作">
                                 <a href="{{ url_for('coaches.coach_players', id=coach.id) }}" class="btn btn-outline-primary">旗下队员</a>
+                                {% if current_user.role == 'admin' %}
+                                <a href="{{ url_for('coaches.assign_players', id=coach.id) }}" class="btn btn-outline-success">分配队员</a>
                                 <a href="{{ url_for('coaches.edit_coach', id=coach.id) }}" class="btn btn-outline-secondary">编辑</a>
                                 <form action="{{ url_for('coaches.delete_coach', id=coach.id) }}" method="POST" class="d-inline"
                                       onsubmit="return confirm('确认删除该教练员吗？');">
                                     <button type="submit" class="btn btn-outline-danger">删除</button>
                                 </form>
+                                {% endif %}
                             </div>
                         </td>
                     </tr>

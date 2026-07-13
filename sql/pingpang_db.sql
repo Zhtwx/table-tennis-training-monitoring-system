@@ -33,10 +33,12 @@ CREATE TABLE athlete (
     play_style      VARCHAR(100),
     grip            VARCHAR(50),
     contact_phone   VARCHAR(20),
+    primary_coach_id INT,
     injury_status   ENUM('健康','观察中','康复中','伤病中')
                         NOT NULL DEFAULT '健康',
     create_time     TIMESTAMP       DEFAULT CURRENT_TIMESTAMP,
-    update_time     TIMESTAMP
+    update_time     TIMESTAMP,
+    INDEX idx_athlete_primary_coach (primary_coach_id)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8;
 
 -- 表 2: coach  教练员
@@ -49,6 +51,11 @@ CREATE TABLE coach (
     email           VARCHAR(100)    UNIQUE,
     create_time     TIMESTAMP       DEFAULT CURRENT_TIMESTAMP
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8;
+
+ALTER TABLE athlete
+    ADD CONSTRAINT fk_athlete_primary_coach
+        FOREIGN KEY (primary_coach_id) REFERENCES coach(id)
+        ON DELETE RESTRICT ON UPDATE CASCADE;
 
 -- 表 3: training_plan  训练计划
 CREATE TABLE training_plan (
@@ -188,6 +195,17 @@ INSERT INTO coach (name, gender, specialty, contact_phone, email) VALUES
 ('陈指导', '男', '技术训练', '13900002001', 'chen@pingpang.cn'),
 ('刘指导', '女', '体能训练', '13900002002', 'liu@pingpang.cn'),
 ('马指导', '男', '战术分析', '13900002003', 'ma@pingpang.cn');
+
+UPDATE athlete
+SET primary_coach_id = CASE id
+    WHEN 1 THEN 1
+    WHEN 2 THEN 2
+    WHEN 3 THEN 3
+    WHEN 4 THEN 1
+    WHEN 5 THEN 2
+    WHEN 6 THEN 3
+END
+WHERE id BETWEEN 1 AND 6;
 
 INSERT INTO training_plan (athlete_id, coach_id, plan_name, start_date, end_date, training_content, intensity, hours, status) VALUES
 (1, 1, '正手暴冲特训',  '2026-06-01', '2026-06-14', '正手位发力优化 + 连续拉球',                '高', 28.0, '已完成'),

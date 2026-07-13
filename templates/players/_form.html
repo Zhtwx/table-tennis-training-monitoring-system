@@ -58,3 +58,13 @@
         {% endfor %}
     </select>
 </div>
+<div class="col-12 col-md-6">
+    <label for="coach_id" class="form-label">所属教练</label>
+    {% set selected_coach_id = request.form.get('coach_id') or (form_player.coach_id|string if form_player.coach_id is defined else '') %}
+    <select class="form-select" id="coach_id" name="coach_id" required>
+        <option value="">请选择</option>
+        {% for coach in coaches %}
+            <option value="{{ coach.id }}" {% if selected_coach_id == coach.id|string %}selected{% endif %}>{{ coach.name }}</option>
+        {% endfor %}
+    </select>
+</div>

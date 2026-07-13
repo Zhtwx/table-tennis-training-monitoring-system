@@ -31,25 +31,6 @@ FALLBACK_COACHES = [
     },
 ]
 
-FALLBACK_PLAYERS = [
-    {
-        "id": 1,
-        "name": "王一鸣",
-        "gender": "男",
-        "birth_date": "2007-03-10",
-        "team": "一队",
-        "skill_level": "一级运动员",
-    },
-    {
-        "id": 2,
-        "name": "李清扬",
-        "gender": "女",
-        "birth_date": "2008-05-21",
-        "team": "一队",
-        "skill_level": "二级运动员",
-    },
-]
-
 FALLBACK_TRAINING_PLANS = [
     {"athlete_id": 1, "coach_id": 1, "start_date": "2026-07-01"},
     {"athlete_id": 2, "coach_id": 2, "start_date": "2026-07-02"},
@@ -97,16 +78,34 @@ def is_database_setup_error(exc):
     return code in DATABASE_SETUP_ERROR_CODES
 
 
+def fallback_player_profiles():
+    """Use the athlete archive as the single source of truth outside MySQL."""
+    from app import PLAYERS
+
+    return PLAYERS
+
+
+def player_primary_coach_id(player):
+    return player.get("primary_coach_id", player.get("coach_id"))
+
+
 def fallback_coach_rows():
     rows = []
     for coach in FALLBACK_COACHES:
         assignments = [
-            plan for plan in FALLBACK_TRAINING_PLANS if plan["coach_id"] == coach["id"]
+            player
+            for player in fallback_player_profiles()
+            if player_primary_coach_id(player) == coach["id"]
         ]
+        athlete_ids = {player["id"] for player in assignments}
         row = dict(coach)
-        row["player_count"] = len({plan["athlete_id"] for plan in assignments})
+        row["player_count"] = len(athlete_ids)
         row["latest_training_date"] = max(
-            (plan["start_date"] for plan in assignments),
+            (
+                plan["start_date"]
+                for plan in FALLBACK_TRAINING_PLANS
+                if plan["athlete_id"] in athlete_ids
+            ),
             default=None,
         )
         rows.append(row)
@@ -161,19 +160,47 @@ def fallback_delete_coach(coach_id):
 
 def fallback_players_for_coach(coach_id):
     rows = []
-    for plan in FALLBACK_TRAINING_PLANS:
-        if plan["coach_id"] != coach_id:
-            continue
-        player = next(
-            (item for item in FALLBACK_PLAYERS if item["id"] == plan["athlete_id"]),
-            None,
-        )
-        if not player:
+    for player in fallback_player_profiles():
+        if player_primary_coach_id(player) != coach_id:
             continue
         row = dict(player)
-        row["latest_training_date"] = plan["start_date"]
+        row["latest_training_date"] = max(
+            (
+                plan["start_date"]
+                for plan in FALLBACK_TRAINING_PLANS
+                if plan["athlete_id"] == player["id"]
+            ),
+            default=None,
+        )
         rows.append(row)
     return sorted(rows, key=lambda item: item["name"])
+
+
+def fallback_assignment_players():
+    coach_names = {coach["id"]: coach["name"] for coach in FALLBACK_COACHES}
+    rows = []
+    for player in fallback_player_profiles():
+        row = dict(player)
+        row["primary_coach_id"] = player_primary_coach_id(player)
+        row["primary_coach_name"] = coach_names.get(row["primary_coach_id"])
+        rows.append(row)
+    return sorted(rows, key=lambda item: item["name"])
+
+
+def sync_in_memory_player_assignments(coach_id, player_ids):
+    from app import COACHES, PLAYERS
+
+    coach = next((item for item in COACHES if item["id"] == coach_id), None)
+    if not coach:
+        return
+    for player in PLAYERS:
+        if player["id"] in player_ids:
+            player["coach_id"] = coach["id"]
+            player["coach_name"] = coach["name"]
+
+
+def fallback_assign_players(coach_id, player_ids):
+    sync_in_memory_player_assignments(coach_id, player_ids)
 
 
 def normalize_text(value):
@@ -274,10 +301,11 @@ def list_coaches():
             c.email,
             c.specialty,
             c.create_time AS hire_date,
-            COUNT(DISTINCT tp.athlete_id) AS player_count,
+            COUNT(DISTINCT a.id) AS player_count,
             MAX(tp.start_date) AS latest_training_date
         FROM coach c
-        LEFT JOIN training_plan tp ON c.id = tp.coach_id
+        LEFT JOIN athlete a ON c.id = a.primary_coach_id
+        LEFT JOIN training_plan tp ON a.id = tp.athlete_id
         GROUP BY c.id, c.name, c.gender, c.contact_phone, c.email, c.specialty, c.create_time
         ORDER BY c.id DESC
     """
@@ -416,6 +444,69 @@ def delete_coach(id):
     return redirect(url_for("coaches.list"))
 
 
+@bp.route("/<int:id>/assign-players", methods=["GET", "POST"])
+@role_required("admin")
+def assign_players(id):
+    try:
+        coach = fetch_one("SELECT id, name FROM coach WHERE id=%s", (id,))
+        if not coach:
+            flash("教练员不存在。", "warning")
+            return redirect(url_for("coaches.list"))
+        players = fetch_all(
+            """
+            SELECT
+                a.id,
+                a.name,
+                a.gender,
+                a.team,
+                a.skill_level,
+                a.primary_coach_id,
+                assigned_coach.name AS primary_coach_name
+            FROM athlete a
+            LEFT JOIN coach assigned_coach ON assigned_coach.id = a.primary_coach_id
+            ORDER BY a.name
+            """
+        )
+        using_fallback = False
+    except MySQLError as exc:
+        if not is_database_setup_error(exc):
+            flash(f"运动员数据暂时不可用：{exc}", "warning")
+            return redirect(url_for("coaches.list"))
+        coach = fallback_get_coach(id)
+        if not coach:
+            flash("教练员不存在。", "warning")
+            return redirect(url_for("coaches.list"))
+        players = fallback_assignment_players()
+        using_fallback = True
+
+    if request.method == "POST":
+        player_ids = {
+            int(value)
+            for value in request.form.getlist("player_ids")
+            if value.isdigit()
+        }
+        available_ids = {player["id"] for player in players}
+        player_ids &= available_ids
+        if not player_ids:
+            flash("请至少选择一名运动员。", "warning")
+            return redirect(url_for("coaches.assign_players", id=id))
+
+        if using_fallback:
+            fallback_assign_players(id, player_ids)
+        else:
+            placeholders = ", ".join(["%s"] * len(player_ids))
+            execute_write(
+                f"UPDATE athlete SET primary_coach_id=%s WHERE id IN ({placeholders})",
+                (id, *sorted(player_ids)),
+            )
+            sync_in_memory_player_assignments(id, player_ids)
+
+        flash(f"已为 {coach['name']} 分配 {len(player_ids)} 名运动员。", "success")
+        return redirect(url_for("coaches.coach_players", id=id))
+
+    return render_template("coaches/assign_players.html", coach=coach, players=players)
+
+
 @bp.route("/<int:id>/players")
 def coach_players(id):
     filters = build_player_filters(request.args)
@@ -436,8 +527,8 @@ def coach_players(id):
                 a.skill_level,
                 MAX(tp.start_date) AS latest_training_date
             FROM athlete a
-            JOIN training_plan tp ON a.id = tp.athlete_id
-            WHERE tp.coach_id = %s
+            LEFT JOIN training_plan tp ON a.id = tp.athlete_id
+            WHERE a.primary_coach_id = %s
             GROUP BY a.id, a.name, a.gender, a.birth_date, a.team, a.skill_level
             ORDER BY a.name
             """,

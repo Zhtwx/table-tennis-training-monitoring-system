@@ -1006,6 +1006,17 @@ ADDITIONAL_DEMO_RECORD_COUNT = (
 
 PLAYERS.extend(DEMO_PLAYERS)
 PLAYERS.extend(ADDITIONAL_DEMO_PLAYERS)
+
+
+def assign_primary_coaches():
+    """Populate the required coach affiliation for all in-memory athlete records."""
+    for index, player in enumerate(PLAYERS):
+        coach = COACHES[index % len(COACHES)]
+        player["coach_id"] = coach["id"]
+        player["coach_name"] = coach["name"]
+
+
+assign_primary_coaches()
 TRAINING_PLANS.extend(DEMO_TRAINING_PLANS)
 TRAINING_PLANS.extend(ADDITIONAL_DEMO_TRAINING_PLANS)
 TECHNICAL_TRAINING_RECORDS.extend(DEMO_TECHNICAL_TRAINING_RECORDS)
@@ -1230,6 +1241,7 @@ def create_app():
             level_labels=PLAYER_LEVEL_LABELS,
             injury_status_labels=PLAYER_INJURY_STATUS_LABELS,
             gender_options=PLAYER_GENDER_OPTIONS,
+            coaches=COACHES,
         )
 
     @players_bp.route("/<int:player_id>", endpoint="detail")
@@ -1293,6 +1305,7 @@ def create_app():
             level_labels=PLAYER_LEVEL_LABELS,
             injury_status_labels=PLAYER_INJURY_STATUS_LABELS,
             gender_options=PLAYER_GENDER_OPTIONS,
+            coaches=COACHES,
         )
 
     @players_bp.route("/<int:player_id>/delete", methods=["POST"], endpoint="delete")
@@ -1972,6 +1985,7 @@ def validate_player_form(form):
     grip = form.get("grip", "").strip()
     contact_phone = form.get("contact_phone", "").strip()
     injury_status_code = form.get("injury_status_code", "healthy").strip()
+    coach_id_text = form.get("coach_id", "").strip()
 
     if not student_no:
         raise ValidationError("学号不能为空。")
@@ -1994,6 +2008,13 @@ def validate_player_form(form):
     if len(contact_phone) > 20:
         raise ValidationError("联系电话不能超过 20 个字符。")
 
+    if not coach_id_text.isdigit():
+        raise ValidationError("请选择有效的所属教练。")
+
+    coach = next((item for item in COACHES if item["id"] == int(coach_id_text)), None)
+    if not coach:
+        raise ValidationError("所属教练不存在。")
+
     level = PLAYER_LEVEL_LABELS[level_code]
     injury_status = PLAYER_INJURY_STATUS_LABELS[injury_status_code]
     return {
@@ -2009,6 +2030,8 @@ def validate_player_form(form):
         "contact_phone": contact_phone,
         "injury_status": injury_status,
         "injury_status_code": injury_status_code,
+        "coach_id": coach["id"],
+        "coach_name": coach["name"],
     }
 
 
