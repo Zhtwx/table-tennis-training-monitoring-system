@@ -39,7 +39,7 @@ def test_stats_export_all_returns_xlsx_workbook():
     assert response.status_code == 200
     assert response.mimetype == "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
     workbook = openpyxl.load_workbook(io.BytesIO(response.data))
-    assert workbook.sheetnames == ["训练计划", "步法训练记录", "技战术训练记录", "体能测试记录", "伤病记录"]
+    assert workbook.sheetnames == ["训练计划", "步法训练记录", "技战术训练记录", "体能训练记录", "伤病记录"]
 
 
 def test_stats_import_accepts_member9_skill_excel_format():

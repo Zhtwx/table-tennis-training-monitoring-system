@@ -218,65 +218,242 @@ PLAYER_INJURY_STATUS_LABELS = {
 
 PLAYER_GENDER_OPTIONS = ["男", "女"]
 
+FITNESS_METRICS = [
+    {
+        "key": "sprint_30m",
+        "label": "30米冲刺",
+        "category": "基础体能",
+        "purpose": "测试速度与爆发力",
+        "note": "站立式起跑，取最好成绩",
+        "unit": "秒",
+        "direction": "lower",
+        "full_score_threshold": {"male": 4.5, "female": 4.5},
+        "min": 0.1,
+        "max": 30.0,
+    },
+    {
+        "key": "abdominal_endurance",
+        "label": "腹肌耐力",
+        "category": "基础体能",
+        "purpose": "测试核心力量与稳定性",
+        "note": "仰卧姿态，保持躯干水平，满分120秒",
+        "unit": "秒",
+        "direction": "higher",
+        "full_score_threshold": 120.0,
+        "min": 0.0,
+        "max": 120.0,
+    },
+    {
+        "key": "back_endurance",
+        "label": "背肌耐力",
+        "category": "基础体能",
+        "purpose": "测试核心力量与抗伤能力",
+        "note": "俯卧姿态，保持躯干水平，满分120秒",
+        "unit": "秒",
+        "direction": "higher",
+        "full_score_threshold": 120.0,
+        "min": 0.0,
+        "max": 120.0,
+    },
+    {
+        "key": "lateral_slide",
+        "label": "侧向滑步",
+        "category": "专项体能",
+        "purpose": "测试专项移动敏捷性",
+        "note": "3米距离，5个来回，记录时间",
+        "unit": "秒",
+        "direction": "lower",
+        "full_score_threshold": {"male": 7.0, "female": 8.3},
+        "min": 0.1,
+        "max": 30.0,
+    },
+    {
+        "key": "a_footwork",
+        "label": "A字移动步法",
+        "category": "专项体能",
+        "purpose": "综合测试乒乓球专项步法",
+        "note": "按特定路线移动，记录时间",
+        "unit": "秒",
+        "direction": "lower",
+        "full_score_threshold": {"male": 10.4, "female": 13.5},
+        "min": 0.1,
+        "max": 40.0,
+    },
+    {
+        "key": "double_under",
+        "label": "双摇跳绳",
+        "category": "专项体能",
+        "purpose": "测试协调性与下肢耐力",
+        "note": "记录60秒内完成次数",
+        "unit": "次",
+        "direction": "higher",
+        "full_score_threshold": {"male": 115.0, "female": 110.0},
+        "min": 0.0,
+        "max": 300.0,
+    },
+    {
+        "key": "seated_rotation_throw",
+        "label": "坐姿旋转抛球",
+        "category": "专项体能",
+        "purpose": "测试核心旋转爆发力",
+        "note": "药球男8磅、女6磅，记录抛投距离",
+        "unit": "厘米",
+        "direction": "higher",
+        "full_score_threshold": {"male": 540.0, "female": 480.0},
+        "min": 0.0,
+        "max": 1000.0,
+    },
+    {
+        "key": "standing_long_jump",
+        "label": "立定跳远",
+        "category": "专项体能",
+        "purpose": "测试下肢爆发力",
+        "note": "取最好成绩",
+        "unit": "厘米",
+        "direction": "higher",
+        "full_score_threshold": {"male": 260.0, "female": 205.0},
+        "min": 0.0,
+        "max": 400.0,
+    },
+]
+FITNESS_METRIC_MAP = {item["key"]: item for item in FITNESS_METRICS}
+FITNESS_SCORE_METRIC_KEYS = [
+    "sprint_30m",
+    "abdominal_endurance",
+    "back_endurance",
+    "lateral_slide",
+    "a_footwork",
+    "double_under",
+]
+
+
+def get_fitness_metric_target(metric_key, athlete_id):
+    metric = FITNESS_METRIC_MAP[metric_key]
+    threshold = metric["full_score_threshold"]
+    if not isinstance(threshold, dict):
+        return float(threshold)
+
+    player = next((item for item in PLAYERS if item["id"] == athlete_id), None)
+    gender_key = "female" if player and player.get("gender") == "女" else "male"
+    return float(threshold[gender_key])
+
+
+def calculate_fitness_metric_score(metric_key, value, athlete_id):
+    target = get_fitness_metric_target(metric_key, athlete_id)
+    if target <= 0:
+        return 0.0
+
+    metric = FITNESS_METRIC_MAP[metric_key]
+    if metric["direction"] == "lower":
+        if value <= 0:
+            return 0.0
+        ratio = target / value
+    else:
+        ratio = value / target
+    return round(min(10.0, ratio * 10), 1)
+
+
+def build_fitness_metric_scores(record):
+    return {
+        metric["key"]: calculate_fitness_metric_score(metric["key"], float(record[metric["key"]]), record["athlete_id"])
+        for metric in FITNESS_METRICS
+    }
+
+
+def calculate_fitness_overall_score(record):
+    metric_scores = build_fitness_metric_scores(record)
+    selected_scores = [metric_scores[key] for key in FITNESS_SCORE_METRIC_KEYS]
+    return round(sum(selected_scores) / len(selected_scores), 2)
+
+
+def build_fitness_test_record(record_id, athlete_id, test_date, tester_id, metrics, notes, created_by):
+    base = {
+        "id": record_id,
+        "athlete_id": athlete_id,
+        "test_date": test_date,
+        "tester_id": tester_id,
+        "notes": notes,
+        "created_by": created_by,
+    }
+    for metric in FITNESS_METRICS:
+        base[metric["key"]] = float(metrics[metric["key"]])
+    base["overall_score"] = calculate_fitness_overall_score(base)
+    return base
 
 
 FITNESS_TESTS = [
-    {
-        "id": 1,
-        "athlete_id": 1,
-        "test_date": "2026-06-03 9:30",
-        "tester_id": 2,
-        "upper_strength": 84.0,
-        "lower_strength": 88.0,
-        "flexibility": 82.0,
-        "endurance": 86.0,
-        "speed": 91.0,
-        "overall_score": 86.2,
-        "notes": "训练状态稳定，体能结构均衡。",
-        "created_by": "coach",
-    },
-    {
-        "id": 2,
-        "athlete_id": 2,
-        "test_date": "2026-06-11 14:00",
-        "tester_id": 2,
-        "upper_strength": 76.0,
-        "lower_strength": 78.0,
-        "flexibility": 74.0,
-        "endurance": 79.0,
-        "speed": 73.0,
-        "overall_score": 76.0,
-        "notes": "速度指标偏低，建议增加敏捷与启动练习。",
-        "created_by": "coach",
-    },
-    {
-        "id": 3,
-        "athlete_id": 3,
-        "test_date": "2026-06-18 10:00",
-        "tester_id": 2,
-        "upper_strength": 82.0,
-        "lower_strength": 84.0,
-        "flexibility": 68.0,
-        "endurance": 81.0,
-        "speed": 76.0,
-        "overall_score": 78.2,
-        "notes": "柔韧性偏低，需加强拉伸和恢复。",
-        "created_by": "admin",
-    },
-    {
-        "id": 4,
-        "athlete_id": 4,
-        "test_date": "2026-07-02 15:00",
-        "tester_id": 2,
-        "upper_strength": 70.0,
-        "lower_strength": 66.0,
-        "flexibility": 58.0,
-        "endurance": 69.0,
-        "speed": 64.0,
-        "overall_score": 65.4,
-        "notes": "恢复期指标偏弱，维持低强度过渡方案。",
-        "created_by": "coach",
-    },
+    build_fitness_test_record(
+        1,
+        1,
+        "2026-06-03 09:30",
+        2,
+        {
+            "sprint_30m": 4.42,
+            "abdominal_endurance": 120,
+            "back_endurance": 118,
+            "lateral_slide": 6.85,
+            "a_footwork": 10.10,
+            "double_under": 118,
+            "seated_rotation_throw": 550,
+            "standing_long_jump": 264,
+        },
+        "速度和专项移动表现突出，适合继续强化赛前爆发力训练。",
+        "coach",
+    ),
+    build_fitness_test_record(
+        2,
+        2,
+        "2026-06-11 14:00",
+        2,
+        {
+            "sprint_30m": 4.63,
+            "abdominal_endurance": 108,
+            "back_endurance": 111,
+            "lateral_slide": 8.42,
+            "a_footwork": 13.72,
+            "double_under": 104,
+            "seated_rotation_throw": 472,
+            "standing_long_jump": 198,
+        },
+        "双摇与立定跳远略弱，建议增加下肢弹跳和绳梯训练。",
+        "coach",
+    ),
+    build_fitness_test_record(
+        3,
+        3,
+        "2026-06-18 10:00",
+        2,
+        {
+            "sprint_30m": 4.58,
+            "abdominal_endurance": 102,
+            "back_endurance": 105,
+            "lateral_slide": 7.18,
+            "a_footwork": 10.76,
+            "double_under": 109,
+            "seated_rotation_throw": 512,
+            "standing_long_jump": 248,
+        },
+        "核心耐力和旋转爆发力还有提升空间，建议补充药球专项训练。",
+        "admin",
+    ),
+    build_fitness_test_record(
+        4,
+        4,
+        "2026-07-02 15:00",
+        2,
+        {
+            "sprint_30m": 4.92,
+            "abdominal_endurance": 84,
+            "back_endurance": 88,
+            "lateral_slide": 8.86,
+            "a_footwork": 14.25,
+            "double_under": 92,
+            "seated_rotation_throw": 438,
+            "standing_long_jump": 186,
+        },
+        "恢复期指标偏弱，当前以低负荷和动作质量恢复为主。",
+        "coach",
+    ),
 ]
 
 TRAINING_SYNC_LOGS = [
@@ -643,7 +820,88 @@ DEMO_TRAINING_PLANS = [
     },
 ]
 
-DEMO_FITNESS_TESTS = [
+DEMO_TECHNICAL_TRAINING_RECORDS = [
+    {
+        "id": 1,
+        "athlete_id": 5,
+        "athlete_name": "孙泽宇",
+        "training_date": "2026-07-03",
+        "footwork_type": "parallel_step",
+        "stroke_technique": "forehand_loop",
+        "multi_ball_minutes": 38,
+        "intensity": "high",
+        "note": "正手连续弧圈质量稳定，需继续压低出台球失误。",
+        "hit_score": 86,
+        "created_by": "coach",
+    },
+    {
+        "id": 2,
+        "athlete_id": 6,
+        "athlete_name": "周雨桐",
+        "training_date": "2026-07-04",
+        "footwork_type": "single_step",
+        "stroke_technique": "defense",
+        "multi_ball_minutes": 32,
+        "intensity": "medium",
+        "note": "削中反攻启动较慢，腕部负荷需控制。",
+        "hit_score": 78,
+        "created_by": "coach",
+    },
+    {
+        "id": 3,
+        "athlete_id": 7,
+        "athlete_name": "吴嘉宁",
+        "training_date": "2026-07-06",
+        "footwork_type": "cross_step",
+        "stroke_technique": "smash",
+        "multi_ball_minutes": 42,
+        "intensity": "high",
+        "note": "侧身后衔接扣杀得分率高，回位速度仍需加强。",
+        "hit_score": 88,
+        "created_by": "coach",
+    },
+    {
+        "id": 4,
+        "athlete_id": 8,
+        "athlete_name": "郑可欣",
+        "training_date": "2026-07-08",
+        "footwork_type": "composite",
+        "stroke_technique": "backhand_drive",
+        "multi_ball_minutes": 25,
+        "intensity": "low",
+        "note": "康复期以稳定触球和小范围移动为主。",
+        "hit_score": 72,
+        "created_by": "coach",
+    },
+    {
+        "id": 5,
+        "athlete_id": 5,
+        "athlete_name": "孙泽宇",
+        "training_date": "2026-07-10",
+        "footwork_type": "composite",
+        "stroke_technique": "serve_receive",
+        "multi_ball_minutes": 45,
+        "intensity": "extreme",
+        "note": "接发抢攻线路主动，极高强度下后半程稳定性下降。",
+        "hit_score": 91,
+        "created_by": "admin",
+    },
+    {
+        "id": 6,
+        "athlete_id": 7,
+        "athlete_name": "吴嘉宁",
+        "training_date": "2026-07-12",
+        "footwork_type": "parallel_step",
+        "stroke_technique": "backhand_drive",
+        "multi_ball_minutes": 36,
+        "intensity": "medium",
+        "note": "反手快拨线路清晰，连续变线后重心保持较好。",
+        "hit_score": 83,
+        "created_by": "coach",
+    },
+]
+
+LEGACY_DEMO_FITNESS_TESTS = [
     {
         "id": 5,
         "athlete_id": 5,
@@ -686,6 +944,63 @@ DEMO_FITNESS_TESTS = [
         "notes": "整体稳定，适合进入赛前专项速度耐力强化。",
         "created_by": "admin",
     },
+]
+
+DEMO_FITNESS_TESTS = [
+    build_fitness_test_record(
+        5,
+        5,
+        "2026-07-03 11:00",
+        2,
+        {
+            "sprint_30m": 4.49,
+            "abdominal_endurance": 116,
+            "back_endurance": 114,
+            "lateral_slide": 7.02,
+            "a_footwork": 10.36,
+            "double_under": 116,
+            "seated_rotation_throw": 542,
+            "standing_long_jump": 261,
+        },
+        "整体接近满分标准，赛前可继续压缩专项移动时间。",
+        "coach",
+    ),
+    build_fitness_test_record(
+        6,
+        6,
+        "2026-07-04 15:30",
+        2,
+        {
+            "sprint_30m": 4.75,
+            "abdominal_endurance": 97,
+            "back_endurance": 100,
+            "lateral_slide": 8.57,
+            "a_footwork": 13.98,
+            "double_under": 101,
+            "seated_rotation_throw": 458,
+            "standing_long_jump": 194,
+        },
+        "专项移动和旋转爆发力稍弱，需要和伤病观察期一起控量推进。",
+        "coach",
+    ),
+    build_fitness_test_record(
+        7,
+        7,
+        "2026-07-12 17:00",
+        2,
+        {
+            "sprint_30m": 4.55,
+            "abdominal_endurance": 109,
+            "back_endurance": 112,
+            "lateral_slide": 7.10,
+            "a_footwork": 10.58,
+            "double_under": 112,
+            "seated_rotation_throw": 525,
+            "standing_long_jump": 252,
+        },
+        "专项能力稳定，可进入赛前速度耐力强化周期。",
+        "admin",
+    ),
 ]
 
 DEMO_INJURY_RECORDS = [
@@ -857,7 +1172,27 @@ ADDITIONAL_DEMO_TRAINING_PLANS = [
     for index, player in enumerate(ADDITIONAL_DEMO_PLAYERS)
 ]
 
-ADDITIONAL_DEMO_FITNESS_TESTS = [
+ADDITIONAL_DEMO_TECHNICAL_TRAINING_RECORDS = [
+    {
+        "id": index + 7,
+        "athlete_id": player["id"],
+        "athlete_name": player["name"],
+        "training_date": (
+            f"{_ADDITIONAL_TREND_MONTHS[index % len(_ADDITIONAL_TREND_MONTHS)]}"
+            f"-{(index % 20) + 1:02d}"
+        ),
+        "footwork_type": _ADDITIONAL_FOOTWORK_CODES[index % len(_ADDITIONAL_FOOTWORK_CODES)],
+        "stroke_technique": _ADDITIONAL_TECHNIQUE_CODES[index % len(_ADDITIONAL_TECHNIQUE_CODES)],
+        "multi_ball_minutes": 28 + (index % 7) * 4,
+        "intensity": _ADDITIONAL_TECHNICAL_INTENSITIES[index % len(_ADDITIONAL_TECHNICAL_INTENSITIES)],
+        "note": f"{player['name']}完成专项技术训练，重点跟踪步法衔接和击球稳定性。",
+        "hit_score": 74 + (index % 9) * 2,
+        "created_by": "coach" if index % 3 else "admin",
+    }
+    for index, player in enumerate(ADDITIONAL_DEMO_PLAYERS)
+]
+
+LEGACY_ADDITIONAL_DEMO_FITNESS_TESTS = [
     {
         "id": index + 8,
         "athlete_id": player["id"],
@@ -885,6 +1220,31 @@ ADDITIONAL_DEMO_FITNESS_TESTS = [
         "notes": f"{player['name']}体能测试完成，后续按短板指标同步训练负荷。",
         "created_by": "coach" if index % 2 else "admin",
     }
+    for index, player in enumerate(ADDITIONAL_DEMO_PLAYERS)
+]
+
+ADDITIONAL_DEMO_FITNESS_TESTS = [
+    build_fitness_test_record(
+        index + 8,
+        player["id"],
+        (
+            f"{_ADDITIONAL_TREND_MONTHS[index % len(_ADDITIONAL_TREND_MONTHS)]}"
+            f"-{(index % 20) + 1:02d} {10 + (index % 6):02d}:00"
+        ),
+        2,
+        {
+            "sprint_30m": round((4.38 if player["gender"] == "男" else 4.48) + (index % 6) * 0.05, 2),
+            "abdominal_endurance": float(92 + (index * 5) % 29),
+            "back_endurance": float(90 + (index * 4) % 31),
+            "lateral_slide": round((6.82 if player["gender"] == "男" else 8.05) + (index % 5) * 0.09, 2),
+            "a_footwork": round((10.08 if player["gender"] == "男" else 12.88) + (index % 5) * 0.18, 2),
+            "double_under": float((107 if player["gender"] == "男" else 102) + (index * 3) % 14),
+            "seated_rotation_throw": float((505 if player["gender"] == "男" else 445) + (index * 7) % 48),
+            "standing_long_jump": float((238 if player["gender"] == "男" else 188) + (index * 4) % 27),
+        },
+        f"{player['name']}体能训练评估完成，后续按短板项目同步安排训练负荷。",
+        "coach" if index % 2 else "admin",
+    )
     for index, player in enumerate(ADDITIONAL_DEMO_PLAYERS)
 ]
 
@@ -2125,6 +2485,7 @@ def create_app():
             editing_record=editing_record,
             athlete_choices=PLAYERS,
             coach_choices=COACHES,
+            metric_definitions=FITNESS_METRICS,
             summary=summary,
             risk_options=[
                 {"code": "stable", "label": "稳定"},
@@ -2273,7 +2634,7 @@ def create_app():
         write_training_plan_sheet(wb.active, TRAINING_PLANS)
         write_footwork_sheet(wb.create_sheet("步法训练记录"), filter_footwork_training_records(request.args)[0])
         write_technique_tactic_sheet(wb.create_sheet("技战术训练记录"), filter_technique_tactic_records(request.args)[0])
-        write_fitness_sheet(wb.create_sheet("体能测试记录"), FITNESS_TESTS)
+        write_fitness_sheet(wb.create_sheet("体能训练记录"), FITNESS_TESTS)
         write_injury_sheet(wb.create_sheet("伤病记录"), INJURY_RECORDS)
         return send_workbook(wb, "table_tennis_training_all_data.xlsx")
 
@@ -2290,7 +2651,7 @@ def create_app():
     def export_fitness_data():
         wb = openpyxl.Workbook()
         write_fitness_sheet(wb.active, FITNESS_TESTS)
-        return send_workbook(wb, "fitness_tests.xlsx")
+        return send_workbook(wb, "fitness_training_records.xlsx")
 
     app.register_blueprint(players_bp)
     app.register_blueprint(coaches_bp)
@@ -3349,34 +3710,45 @@ def build_home_dashboard_data():
     ]
 
     fitness_radar_indicators = [
-        {"name": "上肢力量", "max": 100},
-        {"name": "下肢力量", "max": 100},
-        {"name": "柔韧性", "max": 100},
-        {"name": "耐力", "max": 100},
-        {"name": "速度", "max": 100},
-        {"name": "爆发力", "max": 100},
-        {"name": "敏捷", "max": 100},
-        {"name": "核心稳定", "max": 100},
-        {"name": "移动效率", "max": 100},
-        {"name": "恢复指数", "max": 100},
+        {"name": "30米冲刺", "max": 10},
+        {"name": "腹肌耐力", "max": 10},
+        {"name": "背肌耐力", "max": 10},
+        {"name": "侧向滑步", "max": 10},
+        {"name": "A字步法", "max": 10},
+        {"name": "双摇跳绳", "max": 10},
+        {"name": "坐姿旋转抛球", "max": 10},
+        {"name": "立定跳远", "max": 10},
+        {"name": "基础体能均分", "max": 10},
+        {"name": "专项体能均分", "max": 10},
     ]
     if FITNESS_TESTS:
-        base_metrics = [
-            round(sum(test["upper_strength"] for test in FITNESS_TESTS) / len(FITNESS_TESTS), 1),
-            round(sum(test["lower_strength"] for test in FITNESS_TESTS) / len(FITNESS_TESTS), 1),
-            round(sum(test["flexibility"] for test in FITNESS_TESTS) / len(FITNESS_TESTS), 1),
-            round(sum(test["endurance"] for test in FITNESS_TESTS) / len(FITNESS_TESTS), 1),
-            round(sum(test["speed"] for test in FITNESS_TESTS) / len(FITNESS_TESTS), 1),
+        enriched_tests = [enrich_fitness_record(test) for test in FITNESS_TESTS]
+        metric_score_averages = [
+            round(sum(test["metric_scores"][metric["key"]] for test in enriched_tests) / len(enriched_tests), 1)
+            for metric in FITNESS_METRICS
         ]
-        upper_strength, lower_strength, flexibility, endurance, speed = base_metrics
-        derived_metrics = [
-            round((lower_strength + speed) / 2, 1),
-            round((speed + flexibility) / 2, 1),
-            round((upper_strength + lower_strength + flexibility) / 3, 1),
-            round((speed + endurance) / 2, 1),
-            round((flexibility + endurance) / 2, 1),
-        ]
-        fitness_radar_values = base_metrics + derived_metrics
+        base_score_keys = {"sprint_30m", "abdominal_endurance", "back_endurance"}
+        base_score_average = round(
+            sum(
+                test["metric_scores"][metric["key"]]
+                for test in enriched_tests
+                for metric in FITNESS_METRICS
+                if metric["key"] in base_score_keys
+            )
+            / (len(enriched_tests) * len(base_score_keys)),
+            1,
+        )
+        special_score_average = round(
+            sum(
+                test["metric_scores"][metric["key"]]
+                for test in enriched_tests
+                for metric in FITNESS_METRICS
+                if metric["key"] not in base_score_keys
+            )
+            / (len(enriched_tests) * (len(FITNESS_METRICS) - len(base_score_keys))),
+            1,
+        )
+        fitness_radar_values = metric_score_averages + [base_score_average, special_score_average]
     else:
         fitness_radar_values = [0 for _ in fitness_radar_indicators]
 
@@ -3393,7 +3765,7 @@ def build_home_dashboard_data():
         "intensity_series": intensity_series,
         "fitness_radar_indicators": fitness_radar_indicators,
         "fitness_radar_values": fitness_radar_values,
-        "fitness_target_values": [85, 86, 82, 86, 88, 87, 84, 85, 86, 83],
+        "fitness_target_values": [10 for _ in fitness_radar_indicators],
     }
 
 
@@ -3654,8 +4026,22 @@ def write_technique_tactic_sheet(ws, records):
 
 
 def write_fitness_sheet(ws, tests):
-    ws.title = "体能测试记录"
-    headers = ["运动员", "测试日期", "测试教练", "上肢力量", "下肢力量", "柔韧性", "耐力", "速度", "综合得分", "备注"]
+    ws.title = "体能训练记录"
+    headers = [
+        "运动员",
+        "测试日期",
+        "测试教练",
+        "30米冲刺(秒)",
+        "腹肌耐力(秒)",
+        "背肌耐力(秒)",
+        "侧向滑步(秒)",
+        "A字移动步法(秒)",
+        "双摇跳绳(次)",
+        "坐姿旋转抛球(厘米)",
+        "立定跳远(厘米)",
+        "综合得分(10分)",
+        "备注",
+    ]
     write_headers(ws, headers)
     for row_idx, test in enumerate(tests, 2):
         player = find_player(test["athlete_id"])
@@ -3663,13 +4049,16 @@ def write_fitness_sheet(ws, tests):
         ws.cell(row=row_idx, column=1, value=player["name"] if player else "未知运动员")
         ws.cell(row=row_idx, column=2, value=test["test_date"])
         ws.cell(row=row_idx, column=3, value=coach["name"] if coach else "未知教练")
-        ws.cell(row=row_idx, column=4, value=test["upper_strength"])
-        ws.cell(row=row_idx, column=5, value=test["lower_strength"])
-        ws.cell(row=row_idx, column=6, value=test["flexibility"])
-        ws.cell(row=row_idx, column=7, value=test["endurance"])
-        ws.cell(row=row_idx, column=8, value=test["speed"])
-        ws.cell(row=row_idx, column=9, value=test["overall_score"])
-        ws.cell(row=row_idx, column=10, value=test.get("notes", ""))
+        ws.cell(row=row_idx, column=4, value=test["sprint_30m"])
+        ws.cell(row=row_idx, column=5, value=test["abdominal_endurance"])
+        ws.cell(row=row_idx, column=6, value=test["back_endurance"])
+        ws.cell(row=row_idx, column=7, value=test["lateral_slide"])
+        ws.cell(row=row_idx, column=8, value=test["a_footwork"])
+        ws.cell(row=row_idx, column=9, value=test["double_under"])
+        ws.cell(row=row_idx, column=10, value=test["seated_rotation_throw"])
+        ws.cell(row=row_idx, column=11, value=test["standing_long_jump"])
+        ws.cell(row=row_idx, column=12, value=test["overall_score"])
+        ws.cell(row=row_idx, column=13, value=test.get("notes", ""))
 
 
 def write_injury_sheet(ws, records):
@@ -4252,8 +4641,8 @@ def filter_fitness_tests(args):
     risk_level = args.get("risk_level", "").strip()
     intensity = args.get("intensity", "").strip()
     score_min = args.get("score_min", "").strip()
-    lower_strength_min = args.get("lower_strength_min", "").strip()
-    speed_min = args.get("speed_min", "").strip()
+    sprint_max = args.get("sprint_max", "").strip()
+    long_jump_min = args.get("long_jump_min", "").strip()
 
     if player_keyword:
         predicates.append(
@@ -4269,11 +4658,11 @@ def filter_fitness_tests(args):
     if intensity:
         predicates.append(lambda record, value=intensity: record["plan_intensity"] == value)
     if is_float_value(score_min):
-        predicates.append(lambda record, value=float(score_min): record["overall_score"] >= value)
-    if is_float_value(lower_strength_min):
-        predicates.append(lambda record, value=float(lower_strength_min): record["lower_strength"] >= value)
-    if is_float_value(speed_min):
-        predicates.append(lambda record, value=float(speed_min): record["speed"] >= value)
+        predicates.append(lambda record, value=float(score_min): record["fitness_score"] >= value)
+    if is_float_value(sprint_max):
+        predicates.append(lambda record, value=float(sprint_max): record["sprint_30m"] <= value)
+    if is_float_value(long_jump_min):
+        predicates.append(lambda record, value=float(long_jump_min): record["standing_long_jump"] >= value)
 
     records = [enrich_fitness_record(item) for item in FITNESS_TESTS]
     records.sort(key=lambda item: (item["test_date"], item["id"]), reverse=True)
@@ -4287,13 +4676,29 @@ def enrich_fitness_record(record):
     player = next((item for item in PLAYERS if item["id"] == record["athlete_id"]), None)
     coach = next((item for item in COACHES if item["id"] == record["tester_id"]), None)
     sync_plan = next((item for item in TRAINING_SYNC_LOGS if item["fitness_test_id"] == record["id"]), None)
+    metric_scores = build_fitness_metric_scores(record)
     risk = evaluate_fitness_risk(record)
-    score = calculate_fitness_score(record)
-    upper_strength_status = classify_metric_status(record["upper_strength"], 70, 80, lower_is_worse=True)
-    lower_strength_status = classify_metric_status(record["lower_strength"], 70, 80, lower_is_worse=True)
-    flexibility_status = classify_metric_status(record["flexibility"], 70, 80, lower_is_worse=True)
-    endurance_status = classify_metric_status(record["endurance"], 75, 85, lower_is_worse=True)
-    speed_status = classify_metric_status(record["speed"], 75, 85, lower_is_worse=True)
+    metric_statuses = {
+        metric["key"]: classify_metric_status(metric_scores[metric["key"]])
+        for metric in FITNESS_METRICS
+    }
+    category_map = {"基础体能": [], "专项体能": []}
+    for metric in FITNESS_METRICS:
+        grade = classify_metric_grade(metric_scores[metric["key"]])
+        metric_item = {
+            "key": metric["key"],
+            "label": metric["label"],
+            "category": metric["category"],
+            "unit": metric["unit"],
+            "value": record[metric["key"]],
+            "score": metric_scores[metric["key"]],
+            "status": metric_statuses[metric["key"]],
+            "grade_label": grade["label"],
+            "grade_class": grade["class"],
+            "full_score_threshold": get_fitness_metric_target(metric["key"], record["athlete_id"]),
+        }
+        category_map[metric["category"]].append(metric_item)
+
     base = dict(record)
     base.update(
         {
@@ -4304,12 +4709,12 @@ def enrich_fitness_record(record):
             "risk_code": risk["code"],
             "risk_label": risk["label"],
             "risk_class": risk["class"],
-            "fitness_score": score,
-            "upper_strength_status": upper_strength_status,
-            "lower_strength_status": lower_strength_status,
-            "flexibility_status": flexibility_status,
-            "endurance_status": endurance_status,
-            "speed_status": speed_status,
+            "fitness_score": calculate_fitness_score(record),
+            "overall_grade": classify_metric_grade(calculate_fitness_score(record)),
+            "metric_scores": metric_scores,
+            "metric_statuses": metric_statuses,
+            "basic_metrics": category_map["基础体能"],
+            "special_metrics": category_map["专项体能"],
             "plan_name": sync_plan["plan_name"] if sync_plan else "-",
             "plan_hours": sync_plan["hours"] if sync_plan else 0,
             "plan_intensity": sync_plan["intensity"] if sync_plan else "",
@@ -4320,56 +4725,33 @@ def enrich_fitness_record(record):
 
 
 def evaluate_fitness_risk(record):
-    alerts = 0
-    observes = 0
-    if record["upper_strength"] < 70:
-        alerts += 1
-    elif record["upper_strength"] < 80:
-        observes += 1
-    if record["lower_strength"] < 70:
-        alerts += 1
-    elif record["lower_strength"] < 80:
-        observes += 1
-    if record["flexibility"] < 70:
-        alerts += 1
-    elif record["flexibility"] < 80:
-        observes += 1
-    if record["endurance"] < 75:
-        alerts += 1
-    elif record["endurance"] < 85:
-        observes += 1
-    if record["speed"] < 75:
-        alerts += 1
-    elif record["speed"] < 85:
-        observes += 1
-    if alerts >= 2:
+    scores = build_fitness_metric_scores(record)
+    alerts = sum(1 for value in scores.values() if value < 6)
+    observes = sum(1 for value in scores.values() if 6 <= value < 8)
+    average_score = round(sum(scores.values()) / len(scores), 1)
+    if alerts >= 2 or average_score < 6:
         return {"code": "alert", "label": "预警", "class": "danger"}
-    if alerts == 1 or observes >= 2:
+    if alerts == 1 or observes >= 3 or average_score < 8:
         return {"code": "observe", "label": "观察", "class": "warning"}
     return {"code": "stable", "label": "稳定", "class": "success"}
 
 
 def calculate_fitness_score(record):
-    score = (
-        record["upper_strength"]
-        + record["lower_strength"]
-        + record["flexibility"]
-        + record["endurance"]
-        + record["speed"]
-    ) / 5
-    return round(score, 1)
+    return round(calculate_fitness_overall_score(record), 1)
 
 
-def classify_metric_status(value, alert_threshold, observe_threshold, *, lower_is_worse):
-    if lower_is_worse:
-        if value < alert_threshold:
-            return "alert"
-        if value < observe_threshold:
-            return "observe"
-        return "normal"
-    if value > alert_threshold:
+def classify_metric_grade(score):
+    if score >= 9:
+        return {"label": "优", "class": "success"}
+    if score >= 8:
+        return {"label": "良", "class": "primary"}
+    return {"label": "合格", "class": "secondary"}
+
+
+def classify_metric_status(score):
+    if score < 6:
         return "alert"
-    if value > observe_threshold:
+    if score < 8:
         return "observe"
     return "normal"
 
@@ -4378,15 +4760,16 @@ def build_fitness_summary(records):
     risk_counts = {"稳定": 0, "观察": 0, "预警": 0}
     monthly_map = {}
     player_map = {}
+    metric_averages = []
     for record in records:
         risk_counts[record["risk_label"]] += 1
         month_key = record["test_date"][:7]
         monthly_stats = monthly_map.setdefault(
             month_key,
-            {"score_total": 0.0, "speed_total": 0.0, "hours_total": 0.0, "count": 0},
+            {"score_total": 0.0, "sprint_total": 0.0, "hours_total": 0.0, "count": 0},
         )
         monthly_stats["score_total"] += record["fitness_score"]
-        monthly_stats["speed_total"] += record["speed"]
+        monthly_stats["sprint_total"] += record["sprint_30m"]
         monthly_stats["hours_total"] += record["plan_hours"]
         monthly_stats["count"] += 1
 
@@ -4396,7 +4779,7 @@ def build_fitness_summary(records):
 
     month_labels = sorted(monthly_map.keys())
     monthly_scores = [round(monthly_map[key]["score_total"] / monthly_map[key]["count"], 1) for key in month_labels]
-    monthly_speed = [round(monthly_map[key]["speed_total"] / monthly_map[key]["count"], 1) for key in month_labels]
+    monthly_sprint = [round(monthly_map[key]["sprint_total"] / monthly_map[key]["count"], 2) for key in month_labels]
     monthly_hours = [round(monthly_map[key]["hours_total"], 1) for key in month_labels]
 
     player_scores = sorted(
@@ -4412,15 +4795,29 @@ def build_fitness_summary(records):
     )
     top_player_scores = player_scores[:5]
 
+    for metric in FITNESS_METRICS:
+        metric_averages.append(
+            {
+                "key": metric["key"],
+                "label": metric["label"],
+                "unit": metric["unit"],
+                "value": round(
+                    sum(float(record[metric["key"]]) for record in records) / len(records),
+                    2,
+                ) if records else 0,
+            }
+        )
+
     return {
         "record_count": len(records),
         "warning_count": risk_counts["预警"],
         "average_score": round(sum(record["fitness_score"] for record in records) / len(records), 1) if records else 0,
-        "avg_speed": round(sum(record["speed"] for record in records) / len(records), 1) if records else 0,
+        "avg_sprint_time": round(sum(record["sprint_30m"] for record in records) / len(records), 2) if records else 0,
+        "metric_averages": metric_averages,
         "risk_pie": [{"name": key, "value": value} for key, value in risk_counts.items()],
         "month_labels": month_labels,
         "monthly_scores": monthly_scores,
-        "monthly_speed": monthly_speed,
+        "monthly_sprint": monthly_sprint,
         "monthly_hours": monthly_hours,
         "player_names": [item["name"] for item in top_player_scores],
         "player_scores": [item["score"] for item in top_player_scores],
@@ -4502,11 +4899,14 @@ def validate_fitness_form(form):
     except ValueError as exc:
         raise ValidationError("测试日期格式错误，请使用 YYYY-MM-DD。") from exc
 
-    upper_strength = parse_float_range(form.get("upper_strength", "").strip(), "上肢力量", 0, 100)
-    lower_strength = parse_float_range(form.get("lower_strength", "").strip(), "下肢力量", 0, 100)
-    flexibility = parse_float_range(form.get("flexibility", "").strip(), "柔韧性", 0, 100)
-    endurance = parse_float_range(form.get("endurance", "").strip(), "耐力", 0, 100)
-    speed = parse_float_range(form.get("speed", "").strip(), "速度", 0, 100)
+    metric_values = {}
+    for metric in FITNESS_METRICS:
+        metric_values[metric["key"]] = parse_float_range(
+            form.get(metric["key"], "").strip(),
+            metric["label"],
+            metric["min"],
+            metric["max"],
+        )
     hours = parse_float_range(form.get("hours", "").strip(), "训练时长", 0, 999.9)
 
     intensity = form.get("intensity", "").strip()
@@ -4523,25 +4923,20 @@ def validate_fitness_form(form):
     if len(notes) > 120:
         raise ValidationError("备注不能超过 120 个字符。")
 
-    overall_score = round((upper_strength + lower_strength + flexibility + endurance + speed) / 5, 2)
-
-    return {
+    result = {
         "record_id": int(record_id) if record_id.isdigit() else None,
         "athlete_id": athlete_id,
         "test_date": test_date,
         "tester_id": tester_id,
-        "upper_strength": upper_strength,
-        "lower_strength": lower_strength,
-        "flexibility": flexibility,
-        "endurance": endurance,
-        "speed": speed,
-        "overall_score": overall_score,
         "plan_name": plan_name,
         "hours": hours,
         "intensity": intensity,
         "plan_status": plan_status,
         "notes": notes,
     }
+    result.update(metric_values)
+    result["overall_score"] = calculate_fitness_overall_score(result)
+    return result
 
 
 def build_redirect_query(form):
