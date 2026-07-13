@@ -150,6 +150,110 @@
     </div>
 </div>
 
+<div class="card shadow-sm mb-4">
+    <div class="card-header bg-white border-0 pt-4 px-4">
+        <h2 class="h5 mb-1">{% if editing_record %}修改比赛成绩{% else %}新增比赛成绩{% endif %}</h2>
+        <p class="text-secondary small mb-0">维护比赛日期、对手、比分、结果和复盘内容。</p>
+    </div>
+    <div class="card-body">
+        <form method="post" action="{{ url_for('matches.list') }}" class="row g-3">
+            <input type="hidden" name="record_id" value="{{ editing_record.id if editing_record else '' }}">
+            <div class="col-12 col-md-3">
+                <label for="athlete_id" class="form-label">运动员</label>
+                <select class="form-select" id="athlete_id" name="athlete_id" required>
+                    <option value="">请选择运动员</option>
+                    {% for athlete in athlete_choices %}
+                        <option value="{{ athlete.id }}" {% if editing_record and editing_record.athlete_id == athlete.id %}selected{% endif %}>
+                            {{ athlete.student_no }} - {{ athlete.name }}
+                        </option>
+                    {% endfor %}
+                </select>
+            </div>
+            <div class="col-12 col-md-3">
+                <label for="match_date" class="form-label">比赛日期</label>
+                <input type="date" class="form-control" id="match_date" name="match_date"
+                       value="{{ editing_record.match_date if editing_record else '' }}" required>
+            </div>
+            <div class="col-12 col-md-3">
+                <label for="match_name" class="form-label">比赛名称</label>
+                <input type="text" class="form-control" id="match_name" name="match_name"
+                       value="{{ editing_record.match_name if editing_record else '' }}" required>
+            </div>
+            <div class="col-12 col-md-3">
+                <label for="match_type" class="form-label">比赛类型</label>
+                <select class="form-select" id="match_type" name="match_type" required>
+                    {% for option in match_type_options %}
+                        <option value="{{ option }}" {% if editing_record and editing_record.match_type == option %}selected{% endif %}>{{ option }}</option>
+                    {% endfor %}
+                </select>
+            </div>
+            <div class="col-12 col-md-3">
+                {% set current_source = editing_record.opponent_source if editing_record else 'internal' %}
+                <label for="opponent_source" class="form-label">对手来源</label>
+                <select class="form-select" id="opponent_source" name="opponent_source" required>
+                    {% for option in opponent_source_options %}
+                        <option value="{{ option.value }}" {% if current_source == option.value %}selected{% endif %}>{{ option.label }}</option>
+                    {% endfor %}
+                </select>
+            </div>
+            <div class="col-12 col-md-3" id="internalOpponentGroup">
+                <label for="opponent_id" class="form-label">系统内对手</label>
+                <select class="form-select" id="opponent_id" name="opponent_id">
+                    <option value="">请选择对手</option>
+                    {% for athlete in athlete_choices %}
+                        <option value="{{ athlete.id }}" {% if editing_record and editing_record.opponent_id == athlete.id %}selected{% endif %}>
+                            {{ athlete.student_no }} - {{ athlete.name }}
+                        </option>
+                    {% endfor %}
+                </select>
+            </div>
+            <div class="col-12 col-md-3" id="externalOpponentGroup">
+                <label for="opponent_external_name" class="form-label">系统外对手</label>
+                <input type="text" class="form-control" id="opponent_external_name" name="opponent_external_name"
+                       value="{{ editing_record.opponent_external_name if editing_record else '' }}" placeholder="请输入外部参赛者姓名">
+            </div>
+            <div class="col-6 col-md-2">
+                <label for="result_form" class="form-label">比赛结果</label>
+                <select class="form-select" id="result_form" name="result" required>
+                    {% for option in result_options %}
+                        <option value="{{ option }}" {% if editing_record and editing_record.result == option %}selected{% endif %}>{{ option }}</option>
+                    {% endfor %}
+                </select>
+            </div>
+            <div class="col-6 col-md-2">
+                <label for="score" class="form-label">比分</label>
+                <input type="text" class="form-control" id="score" name="score"
+                       value="{{ editing_record.score if editing_record else '' }}" placeholder="如：3:1" required>
+            </div>
+            <div class="col-12 col-md-2">
+                <label for="rank" class="form-label">名次/阶段</label>
+                <input type="text" class="form-control" id="rank" name="rank"
+                       value="{{ editing_record.rank if editing_record else '' }}" placeholder="如：八强">
+            </div>
+            <div class="col-12 col-md-6">
+                <label for="key_points" class="form-label">关键分复盘</label>
+                <textarea class="form-control" id="key_points" name="key_points" rows="2">{{ editing_record.key_points if editing_record else '' }}</textarea>
+            </div>
+            <div class="col-12 col-md-6">
+                <label for="tactic_review" class="form-label">战术复盘</label>
+                <textarea class="form-control" id="tactic_review" name="tactic_review" rows="2">{{ editing_record.tactic_review if editing_record else '' }}</textarea>
+            </div>
+            <div class="col-12">
+                <label for="improvement" class="form-label">改进方向</label>
+                <textarea class="form-control" id="improvement" name="improvement" rows="2">{{ editing_record.improvement if editing_record else '' }}</textarea>
+            </div>
+            <div class="col-12 d-flex justify-content-end gap-2">
+                {% if editing_record %}
+                    <a href="{{ url_for('matches.list') }}" class="btn btn-outline-secondary">取消修改</a>
+                {% else %}
+                    <button type="reset" class="btn btn-outline-secondary">重置</button>
+                {% endif %}
+                <button type="submit" class="btn btn-primary">{% if editing_record %}保存修改{% else %}保存成绩{% endif %}</button>
+            </div>
+        </form>
+    </div>
+</div>
+
 <div class="card shadow-sm">
     <div class="card-header bg-white border-0 pt-4 px-4">
         <h2 class="h5 mb-1">成绩与技战术复盘</h2>
@@ -167,7 +271,8 @@
                         <th>比分</th>
                         <th>关键分复盘</th>
                         <th>改进方向</th>
-                        <th class="text-end">结果</th>
+                        <th>结果</th>
+                        <th class="text-end">操作</th>
                     </tr>
                 </thead>
                 <tbody>
@@ -180,17 +285,27 @@
                         </td>
                         <td>
                             <div>{{ record.match_name }}</div>
-                            <div class="text-secondary small">{{ record.rank }}</div>
+                            <div class="text-secondary small">{{ record.match_type }}{% if record.rank %} · {{ record.rank }}{% endif %}</div>
                         </td>
-                        <td>{{ record.opponent }}</td>
+                        <td>
+                            <div>{{ record.opponent }}</div>
+                            {% if record.opponent_student_no %}
+                                <div class="text-secondary small">{{ record.opponent_student_no }}</div>
+                            {% else %}
+                                <div class="text-secondary small">{{ record.opponent_source_label }}</div>
+                            {% endif %}
+                        </td>
                         <td class="fw-semibold">{{ record.score }}</td>
                         <td class="small">{{ record.key_points }}</td>
                         <td class="small">{{ record.improvement }}</td>
-                        <td class="text-end"><span class="badge text-bg-{{ record.result_class }}">{{ record.result }}</span></td>
+                        <td><span class="badge text-bg-{{ record.result_class }}">{{ record.result }}</span></td>
+                        <td class="text-end text-nowrap">
+                            <a href="{{ url_for('matches.list', edit_id=record.id) }}" class="btn btn-sm btn-outline-primary">修改</a>
+                        </td>
                     </tr>
                     {% else %}
                     <tr>
-                        <td colspan="8" class="text-center text-secondary py-5">暂无比赛成绩记录。</td>
+                        <td colspan="9" class="text-center text-secondary py-5">暂无比赛成绩记录。</td>
                     </tr>
                     {% endfor %}
                 </tbody>
@@ -203,6 +318,24 @@
 {% block scripts %}
 <script>
     document.addEventListener('DOMContentLoaded', function () {
+        const opponentSource = document.getElementById('opponent_source');
+        const internalGroup = document.getElementById('internalOpponentGroup');
+        const externalGroup = document.getElementById('externalOpponentGroup');
+        const opponentId = document.getElementById('opponent_id');
+        const opponentExternalName = document.getElementById('opponent_external_name');
+        function syncOpponentFields() {
+            if (!opponentSource || !internalGroup || !externalGroup) return;
+            const isInternal = opponentSource.value === 'internal';
+            internalGroup.classList.toggle('d-none', !isInternal);
+            externalGroup.classList.toggle('d-none', isInternal);
+            if (opponentId) opponentId.required = isInternal;
+            if (opponentExternalName) opponentExternalName.required = !isInternal;
+        }
+        if (opponentSource) {
+            opponentSource.addEventListener('change', syncOpponentFields);
+            syncOpponentFields();
+        }
+
         const chartEl = document.getElementById('matchResultChart');
         if (!chartEl) return;
         const chart = echarts.init(chartEl);

@@ -115,6 +115,43 @@ def test_training_record_form_uses_current_player_list():
     assert PLAYERS[-1]["name"] in body
 
 
+def test_training_record_list_supports_pagination_with_filters():
+    original_records = deepcopy(get_training_records())
+    try:
+        records = get_training_records()
+        records[:] = []
+        for index in range(12):
+            records.append(
+                {
+                    "id": index + 1,
+                    "athlete_id": PLAYERS[0]["id"],
+                    "athlete_name": PLAYERS[0]["name"],
+                    "training_date": f"2026-07-{index + 1:02d}",
+                    "footwork_type": "cross_step",
+                    "stroke_technique": "smash",
+                    "multi_ball_minutes": 30 + index,
+                    "intensity": "high",
+                    "note": f"pagination note {index + 1}",
+                    "created_by": "admin",
+                }
+            )
+
+        client = app.test_client()
+        login(client)
+        response = client.get("/training/records?intensity=high&page=2")
+        body = response.get_data(as_text=True)
+
+        assert response.status_code == 200
+        assert "pagination note 2" in body
+        assert "pagination note 12" not in body
+        assert "第 2 / 2 页" in body
+        assert "page=1" in body
+        assert "intensity=high" in body
+    finally:
+        records = get_training_records()
+        records[:] = original_records
+
+
 def test_skill_excel_import_accepts_player_name_and_student_no():
     original_records = deepcopy(get_training_records())
     try:
@@ -191,5 +228,76 @@ def test_skill_excel_import_creates_player_archive_for_new_names():
         assert records[-1]["athlete_name"] == "小明"
     finally:
         app_module.PLAYERS[:] = original_players
+        records = get_training_records()
+        records[:] = original_records
+
+
+def test_skill_excel_import_skips_existing_records():
+    original_records = deepcopy(get_training_records())
+    try:
+        client = app.test_client()
+        login(client)
+
+        workbook = openpyxl.Workbook()
+        sheet = workbook.active
+        sheet.append(["运动员编号或姓名", "训练日期", "步法类型", "击球技术", "多球时长", "训练强度", "备注"])
+        sheet.append([PLAYERS[0]["name"], "2026-07-10", "交叉步", "扣杀", 30, "高强度", "existing import"])
+        payload = io.BytesIO()
+        workbook.save(payload)
+        payload_bytes = payload.getvalue()
+
+        first_response = client.post(
+            "/training/records/import-excel",
+            data=csrf_data(client, {"training_excel": (io.BytesIO(payload_bytes), "skill_import.xlsx")}),
+            content_type="multipart/form-data",
+            follow_redirects=True,
+        )
+        assert first_response.status_code == 200
+        assert len(get_training_records()) == len(original_records) + 1
+
+        second_response = client.post(
+            "/training/records/import-excel",
+            data=csrf_data(client, {"training_excel": (io.BytesIO(payload_bytes), "skill_import.xlsx")}),
+            content_type="multipart/form-data",
+            follow_redirects=True,
+        )
+
+        body = second_response.get_data(as_text=True)
+        assert second_response.status_code == 200
+        assert len(get_training_records()) == len(original_records) + 1
+        assert "重复专项技术记录已跳过" in body
+    finally:
+        records = get_training_records()
+        records[:] = original_records
+
+
+def test_skill_excel_import_skips_duplicate_rows_in_same_file():
+    original_records = deepcopy(get_training_records())
+    try:
+        client = app.test_client()
+        login(client)
+
+        workbook = openpyxl.Workbook()
+        sheet = workbook.active
+        sheet.append(["运动员编号或姓名", "训练日期", "步法类型", "击球技术", "多球时长", "训练强度", "备注"])
+        duplicate_row = [PLAYERS[0]["name"], "2026-07-10", "交叉步", "扣杀", 30, "高强度", "same file duplicate"]
+        sheet.append(duplicate_row)
+        sheet.append(duplicate_row)
+        payload = io.BytesIO()
+        workbook.save(payload)
+        payload.seek(0)
+
+        response = client.post(
+            "/training/records/import-excel",
+            data=csrf_data(client, {"training_excel": (payload, "skill_import.xlsx")}),
+            content_type="multipart/form-data",
+            follow_redirects=True,
+        )
+
+        body = response.get_data(as_text=True)
+        assert response.status_code == 200
+        assert len(get_training_records()) == len(original_records) + 1
+        assert "第 3 行：重复专项技术记录已跳过" in body
+    finally:
         records = get_training_records()
         records[:] = original_records

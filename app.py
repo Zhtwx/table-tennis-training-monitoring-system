@@ -1211,15 +1211,38 @@ def create_app():
     @role_required("admin", "coach")
     def players_list():
         players, active_condition_count = filter_players(request.args)
+        page_size = 10
+        page = request.args.get("page", "1")
+        page = int(page) if page.isdigit() and int(page) > 0 else 1
+        filtered_count = len(players)
+        total_pages = max(1, (filtered_count + page_size - 1) // page_size)
+        page = min(page, total_pages)
+        page_start = (page - 1) * page_size
+        paged_players = players[page_start : page_start + page_size]
+        pagination_args = request.args.to_dict(flat=True)
+        pagination_args.pop("page", None)
         return render_template(
             "players/list.html",
-            players=players,
+            players=paged_players,
             total_count=len(PLAYERS),
+            filtered_count=filtered_count,
             active_condition_count=active_condition_count,
             logic=request.args.get("logic", "and"),
             level_labels=PLAYER_LEVEL_LABELS,
             injury_status_labels=PLAYER_INJURY_STATUS_LABELS,
             gender_options=PLAYER_GENDER_OPTIONS,
+            pagination={
+                "page": page,
+                "page_size": page_size,
+                "total_pages": total_pages,
+                "has_prev": page > 1,
+                "has_next": page < total_pages,
+                "prev_page": page - 1,
+                "next_page": page + 1,
+                "start": page_start + 1 if filtered_count else 0,
+                "end": min(page_start + page_size, filtered_count),
+                "args": pagination_args,
+            },
         )
 
     @players_bp.route("/create", methods=["GET", "POST"], endpoint="create")
@@ -1494,16 +1517,39 @@ def create_app():
     @role_required("admin", "coach")
     def training_records():
         records, active_condition_count = filter_technical_training_records(request.args)
+        page_size = 10
+        page = request.args.get("page", "1")
+        page = int(page) if page.isdigit() and int(page) > 0 else 1
+        filtered_count = len(records)
+        total_pages = max(1, (filtered_count + page_size - 1) // page_size)
+        page = min(page, total_pages)
+        page_start = (page - 1) * page_size
+        paged_records = records[page_start : page_start + page_size]
+        pagination_args = request.args.to_dict(flat=True)
+        pagination_args.pop("page", None)
         return render_template(
             "training/training_record.html",
-            records=records,
+            records=paged_records,
             athletes=PLAYERS,
             total_count=len(TECHNICAL_TRAINING_RECORDS),
+            filtered_count=filtered_count,
             active_condition_count=active_condition_count,
             footwork_type_labels=FOOTWORK_TYPE_LABELS,
             stroke_technique_labels=STROKE_TECHNIQUE_LABELS,
             technical_intensity_labels=TECHNICAL_INTENSITY_LABELS,
             summary=build_technical_training_summary(records),
+            pagination={
+                "page": page,
+                "page_size": page_size,
+                "total_pages": total_pages,
+                "has_prev": page > 1,
+                "has_next": page < total_pages,
+                "prev_page": page - 1,
+                "next_page": page + 1,
+                "start": page_start + 1 if filtered_count else 0,
+                "end": min(page_start + page_size, filtered_count),
+                "args": pagination_args,
+            },
         )
 
     @training_bp.route("/training_record", endpoint="training_record")
@@ -1587,19 +1633,80 @@ def create_app():
         file = request.files.get("training_excel")
         if not file:
             flash("请先选择 Excel 文件。", "warning")
-            return redirect(url_for("training.batch_import"))
+            return redirect(url_for("training.plans"))
 
         from datetime import datetime, timedelta
         error_rows = []
         imported_count = 0
         global PLAN_ID_COUNTER
 
+        def plan_identity(plan):
+            normalize_text = lambda value: " ".join(str(value or "").split())
+            return (
+                plan["athlete_id"],
+                plan["coach_id"],
+                plan["plan_datetime"],
+                normalize_text(plan["content"]),
+                plan["intensity"],
+                plan["duration"],
+                normalize_text(plan.get("location")),
+            )
+
+        existing_plan_identities = {plan_identity(plan) for plan in TRAINING_PLANS}
+        expected_header_aliases = {
+            "athlete_name": {"运动员", "运动员姓名"},
+            "coach_name": {"教练", "教练员", "教练姓名"},
+            "plan_datetime": {"训练日期", "训练时间", "计划时间"},
+            "content": {"内容", "训练内容", "计划内容"},
+            "intensity": {"强度", "训练强度"},
+            "duration": {"时长", "时长(分钟)", "训练时长", "训练时长(分钟)"},
+            "location": {"地点", "训练地点"},
+        }
+        skill_record_headers = {"运动员", "训练日期", "步法训练", "击球技术", "多球时长", "训练强度", "备注"}
+
+        def normalize_header(value):
+            return str(value or "").strip().replace(" ", "")
+
+        def resolve_training_plan_columns(ws):
+            headers = [normalize_header(cell.value) for cell in ws[1]]
+            header_set = {header for header in headers if header}
+            if skill_record_headers.issubset(header_set):
+                raise ValueError("该文件是专项技术记录模板，请在“专项技术录入”页面导入。")
+
+            column_indexes = {}
+            for field, aliases in expected_header_aliases.items():
+                normalized_aliases = {normalize_header(alias) for alias in aliases}
+                for column_index, header in enumerate(headers):
+                    if header in normalized_aliases:
+                        column_indexes[field] = column_index
+                        break
+
+            required_fields = ["athlete_name", "coach_name", "plan_datetime", "content"]
+            if not all(field in column_indexes for field in required_fields):
+                expected_headers = "运动员、教练、训练日期、内容、强度、时长(分钟)、地点"
+                actual_headers = "、".join(header for header in headers if header) or "空表头"
+                raise ValueError(f"训练计划 Excel 表头不匹配。期望包含：{expected_headers}；当前表头：{actual_headers}")
+            return column_indexes
+
+        def row_value(row, column_indexes, field):
+            column_index = column_indexes.get(field)
+            if column_index is None or column_index >= len(row):
+                return None
+            return row[column_index]
+
         try:
             wb = openpyxl.load_workbook(file)
             ws = wb.active
+            column_indexes = resolve_training_plan_columns(ws)
 
             for idx, row in enumerate(ws.iter_rows(min_row=2, values_only=True), start=2):
-                athlete_name, coach_name, plan_datetime, content, intensity, duration, location = row[:7]
+                athlete_name = row_value(row, column_indexes, "athlete_name")
+                coach_name = row_value(row, column_indexes, "coach_name")
+                plan_datetime = row_value(row, column_indexes, "plan_datetime")
+                content = row_value(row, column_indexes, "content")
+                intensity = row_value(row, column_indexes, "intensity")
+                duration = row_value(row, column_indexes, "duration")
+                location = row_value(row, column_indexes, "location")
                 
                 if not athlete_name and not content:
                     continue
@@ -1616,13 +1723,24 @@ def create_app():
                 plan_datetime_str = None
                 try:
                     if isinstance(plan_datetime, datetime):
-                        plan_datetime_str = plan_datetime.strftime("%Y-%m-%d")
-                    elif isinstance(plan_datetime, int):
-                        plan_datetime_str = (datetime(1899, 12, 30) + timedelta(days=plan_datetime)).strftime("%Y-%m-%d")
+                        plan_datetime_str = plan_datetime.strftime("%Y-%m-%d %H:%M")
+                    elif isinstance(plan_datetime, (int, float)):
+                        plan_datetime_str = (
+                            datetime(1899, 12, 30) + timedelta(days=plan_datetime)
+                        ).strftime("%Y-%m-%d %H:%M")
                     else:
-                        datetime.strptime(str(plan_datetime), "%Y-%m-%d")
-                        plan_datetime_str = str(plan_datetime)
-                except:
+                        date_text = str(plan_datetime).strip()
+                        for date_format in ("%Y-%m-%d %H:%M", "%Y-%m-%d"):
+                            try:
+                                plan_datetime_str = datetime.strptime(
+                                    date_text, date_format
+                                ).strftime("%Y-%m-%d %H:%M")
+                                break
+                            except ValueError:
+                                continue
+                        if plan_datetime_str is None:
+                            raise ValueError("日期格式错误")
+                except (TypeError, ValueError):
                     row_errors.append(f"第{idx}行：日期格式错误")
 
                 valid_intensities = ["低", "中", "高", "极高"]
@@ -1652,7 +1770,12 @@ def create_app():
                     "duration": int(duration) if duration else 60,
                     "location": location or "",
                 }
+                new_plan_identity = plan_identity(new_plan)
+                if new_plan_identity in existing_plan_identities:
+                    error_rows.append(f"第{idx}行：重复训练计划已跳过")
+                    continue
                 TRAINING_PLANS.append(new_plan)
+                existing_plan_identities.add(new_plan_identity)
                 PLAN_ID_COUNTER += 1
                 imported_count += 1
 
@@ -1663,10 +1786,12 @@ def create_app():
             else:
                 flash(f"✅ 成功导入 {imported_count} 条训练计划！", "success")
 
+        except ValueError as e:
+            flash(f"❌ {str(e)}", "danger")
         except Exception as e:
             flash(f"❌ Excel 解析失败：{str(e)}", "danger")
 
-        return redirect(url_for("training.batch_import"))
+        return redirect(url_for("training.plans"))
     @training_bp.route("/plans/export", methods=["GET"])
     @role_required("admin", "coach")
     def export_plans():
@@ -1823,10 +1948,22 @@ def create_app():
 
     matches_bp = Blueprint("matches", __name__, url_prefix="/matches")
 
-    @matches_bp.route("/", endpoint="list")
+    @matches_bp.route("/", methods=["GET", "POST"], endpoint="list")
     @role_required("admin", "coach")
     def matches_list():
+        if request.method == "POST":
+            try:
+                save_match_record(request.form)
+                if request.form.get("record_id", "").strip():
+                    flash("比赛成绩已更新。", "success")
+                else:
+                    flash("比赛成绩已保存。", "success")
+                return redirect(url_for("matches.list"))
+            except ValidationError as exc:
+                flash(str(exc), "danger")
+
         match_records, active_condition_count = filter_match_records(request.args)
+        editing_record = get_editing_match_record(request.args.get("edit_id", "").strip())
         summary = build_match_summary(match_records)
         return render_template(
             "matches/list.html",
@@ -1835,6 +1972,13 @@ def create_app():
             total_count=len(MATCH_RESULTS),
             summary=summary,
             result_options=["胜", "负", "平"],
+            match_type_options=["友谊赛", "正式比赛"],
+            opponent_source_options=[
+                {"value": "internal", "label": "系统内运动员"},
+                {"value": "external", "label": "系统外参赛者"},
+            ],
+            editing_record=editing_record,
+            athlete_choices=PLAYERS,
         )
 
     auth_bp = Blueprint("auth", __name__, url_prefix="/auth")
@@ -2200,17 +2344,111 @@ def filter_match_records(args):
 
 def enrich_match_record(record):
     player = find_player(record["athlete_id"])
+    opponent_player = find_player(record.get("opponent_id"))
+    if not opponent_player and record.get("opponent"):
+        opponent_player = next((item for item in PLAYERS if item["name"] == record["opponent"]), None)
+    opponent_source = record.get("opponent_source")
+    if opponent_source not in {"internal", "external"}:
+        opponent_source = "internal" if opponent_player else "external"
+    match_type = record.get("match_type") or "正式比赛"
     base = dict(record)
     base.update(
         {
             "player_name": player["name"] if player else "未知运动员",
             "student_no": player["student_no"] if player else "-",
             "level": (player.get("skill_level") or player.get("level")) if player else "-",
+            "match_type": match_type,
+            "opponent_source": opponent_source,
+            "opponent_id": opponent_player["id"] if opponent_source == "internal" and opponent_player else record.get("opponent_id"),
+            "opponent": opponent_player["name"] if opponent_source == "internal" and opponent_player else record.get("opponent", ""),
+            "opponent_external_name": record.get("opponent", "") if opponent_source == "external" else "",
+            "opponent_student_no": opponent_player["student_no"] if opponent_source == "internal" and opponent_player else "",
+            "opponent_source_label": "系统内" if opponent_source == "internal" else "系统外",
             "result_class": match_result_class(record["result"]),
             "score_diff": calculate_match_score_diff(record["score"]),
         }
     )
     return base
+
+
+def get_editing_match_record(edit_id):
+    if not edit_id.isdigit():
+        return None
+    record = next((item for item in MATCH_RESULTS if item["id"] == int(edit_id)), None)
+    return enrich_match_record(record) if record else None
+
+
+def save_match_record(form):
+    validated = validate_match_form(form)
+    record_id = validated.pop("record_id")
+    if record_id is None:
+        MATCH_RESULTS.append({"id": next_id(MATCH_RESULTS), **validated})
+        return
+
+    target = next((item for item in MATCH_RESULTS if item["id"] == record_id), None)
+    if not target:
+        raise ValidationError("要修改的比赛成绩不存在。")
+    target.update(validated)
+
+
+def validate_match_form(form):
+    record_id = form.get("record_id", "").strip()
+    athlete_id = parse_int_field(form.get("athlete_id", "").strip(), "运动员")
+    if not find_player(athlete_id):
+        raise ValidationError("所选运动员不存在，请重新选择。")
+
+    match_date = parse_date_field(form.get("match_date", "").strip(), "比赛日期")
+    match_name = form.get("match_name", "").strip()
+    if not match_name:
+        raise ValidationError("比赛名称不能为空。")
+
+    match_type = form.get("match_type", "").strip() or "正式比赛"
+    if match_type not in {"友谊赛", "正式比赛"}:
+        raise ValidationError("比赛类型非法，请选择友谊赛或正式比赛。")
+
+    opponent_source = form.get("opponent_source", "").strip() or "internal"
+    if opponent_source not in {"internal", "external"}:
+        raise ValidationError("对手来源非法，请选择系统内运动员或系统外参赛者。")
+
+    opponent_id = None
+    opponent_name = ""
+    if opponent_source == "internal":
+        opponent_id = parse_int_field(form.get("opponent_id", "").strip(), "对手")
+        opponent_player = find_player(opponent_id)
+        if not opponent_player:
+            raise ValidationError("所选对手不存在，请重新选择。")
+        if opponent_id == athlete_id:
+            raise ValidationError("对手不能与运动员相同。")
+        opponent_name = opponent_player["name"]
+    else:
+        opponent_name = form.get("opponent_external_name", "").strip()
+        if not opponent_name:
+            raise ValidationError("系统外对手姓名不能为空。")
+
+    result = form.get("result", "").strip()
+    if result not in {"胜", "负", "平"}:
+        raise ValidationError("比赛结果非法，请从胜、负、平中选择。")
+
+    score = form.get("score", "").strip()
+    if not score:
+        raise ValidationError("比分不能为空。")
+
+    return {
+        "record_id": int(record_id) if record_id.isdigit() else None,
+        "athlete_id": athlete_id,
+        "match_type": match_type,
+        "opponent_source": opponent_source,
+        "match_date": match_date,
+        "match_name": match_name,
+        "opponent_id": opponent_id,
+        "opponent": opponent_name,
+        "result": result,
+        "score": score,
+        "rank": form.get("rank", "").strip(),
+        "key_points": form.get("key_points", "").strip(),
+        "tactic_review": form.get("tactic_review", "").strip(),
+        "improvement": form.get("improvement", "").strip(),
+    }
 
 
 def match_result_class(result):
@@ -2603,6 +2841,23 @@ def calculate_technical_record_score(record):
 def import_technical_training_excel(file, operator):
     imported_count = 0
     error_rows = []
+
+    def technical_record_identity(record):
+        normalize_text = lambda value: " ".join(str(value or "").split())
+        return (
+            record["athlete_id"],
+            record["training_date"],
+            record["footwork_type"],
+            record["stroke_technique"],
+            record["multi_ball_minutes"],
+            record["intensity"],
+            normalize_text(record.get("note")),
+        )
+
+    existing_record_identities = {
+        technical_record_identity(record) for record in TECHNICAL_TRAINING_RECORDS
+    }
+
     try:
         wb = openpyxl.load_workbook(file)
         ws = wb.active
@@ -2622,9 +2877,15 @@ def import_technical_training_excel(file, operator):
                     intensity_value,
                     note_value,
                 )
+                validated = validate_technical_training_form(form)
+                new_record_identity = technical_record_identity(validated)
+                if new_record_identity in existing_record_identities:
+                    error_rows.append(f"第 {idx} 行：重复专项技术记录已跳过")
+                    continue
                 save_technical_training_record(form, operator)
                 if hit_score is not None and TECHNICAL_TRAINING_RECORDS:
                     TECHNICAL_TRAINING_RECORDS[-1]["hit_score"] = hit_score
+                existing_record_identities.add(new_record_identity)
                 imported_count += 1
             except ValidationError as exc:
                 error_rows.append(f"第 {idx} 行：{exc}")
@@ -3498,6 +3759,7 @@ def build_fitness_summary(records):
         key=lambda item: item["score"],
         reverse=True,
     )
+    top_player_scores = player_scores[:5]
 
     return {
         "record_count": len(records),
@@ -3509,8 +3771,8 @@ def build_fitness_summary(records):
         "monthly_scores": monthly_scores,
         "monthly_speed": monthly_speed,
         "monthly_hours": monthly_hours,
-        "player_names": [item["name"] for item in player_scores],
-        "player_scores": [item["score"] for item in player_scores],
+        "player_names": [item["name"] for item in top_player_scores],
+        "player_scores": [item["score"] for item in top_player_scores],
     }
 
 

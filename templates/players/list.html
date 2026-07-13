@@ -94,7 +94,7 @@
         <div>
             <h2 class="h5 mb-1">运动员列表</h2>
             <p class="text-secondary small mb-0">
-                当前命中 {{ players|length }} 条，共 {{ total_count }} 条；启用 {{ active_condition_count }} 个查询条件。
+                当前命中 {{ filtered_count }} 条，共 {{ total_count }} 条；启用 {{ active_condition_count }} 个查询条件。
             </p>
         </div>
     </div>
@@ -153,5 +153,27 @@
             </table>
         </div>
     </div>
+    {% if pagination.total_pages > 1 %}
+    <div class="card-footer bg-white d-flex flex-column flex-md-row justify-content-between align-items-md-center gap-3">
+        <div class="text-secondary small">
+            显示第 {{ pagination.start }}-{{ pagination.end }} 条，共 {{ filtered_count }} 条；第 {{ pagination.page }} / {{ pagination.total_pages }} 页
+        </div>
+        <nav aria-label="运动员档案分页">
+            <ul class="pagination mb-0">
+                <li class="page-item {% if not pagination.has_prev %}disabled{% endif %}">
+                    <a class="page-link" href="{{ url_for('players.list', page=pagination.prev_page, **pagination.args) }}">上一页</a>
+                </li>
+                {% for page_number in range(1, pagination.total_pages + 1) %}
+                    <li class="page-item {% if page_number == pagination.page %}active{% endif %}">
+                        <a class="page-link" href="{{ url_for('players.list', page=page_number, **pagination.args) }}">{{ page_number }}</a>
+                    </li>
+                {% endfor %}
+                <li class="page-item {% if not pagination.has_next %}disabled{% endif %}">
+                    <a class="page-link" href="{{ url_for('players.list', page=pagination.next_page, **pagination.args) }}">下一页</a>
+                </li>
+            </ul>
+        </nav>
+    </div>
+    {% endif %}
 </div>
 {% endblock %}
