@@ -66,21 +66,24 @@
 <div class="row g-4">
     <div class="col-12 col-xl-6">
         <div class="card shadow-sm h-100">
-            <div class="card-header bg-white border-0 pt-4 px-4"><h2 class="h5 mb-0">近期专项技术记录</h2></div>
+            <div class="card-header bg-white border-0 pt-4 px-4"><h2 class="h5 mb-0">近期训练记录</h2></div>
             <div class="card-body">
-                {% if technical_records %}
+                {% if footwork_records or technique_records %}
                     <div class="table-responsive">
                         <table class="table table-sm">
-                            <thead><tr><th>日期</th><th>步法</th><th>击球</th><th>强度</th></tr></thead>
+                            <thead><tr><th>日期</th><th>类型</th><th>项目</th><th>关键指标</th></tr></thead>
                             <tbody>
-                                {% for record in technical_records[:5] %}
-                                <tr><td>{{ record.training_date }}</td><td>{{ record.footwork_label }}</td><td>{{ record.stroke_label }}</td><td>{{ record.intensity_label }}</td></tr>
+                                {% for record in footwork_records[:3] %}
+                                <tr><td>{{ record.training_date }}</td><td>步法训练</td><td>{{ record.footwork_type_name }}</td><td>{{ record.duration_minutes }}分钟 / {{ record.set_count }}组</td></tr>
+                                {% endfor %}
+                                {% for record in technique_records[:3] %}
+                                <tr><td>{{ record.training_date }}</td><td>技战术训练</td><td>{{ record.technique_name }}</td><td>上台率 {{ record.on_table_rate or '-' }}%</td></tr>
                                 {% endfor %}
                             </tbody>
                         </table>
                     </div>
                 {% else %}
-                    <p class="text-secondary mb-0">暂无专项技术记录。</p>
+                    <p class="text-secondary mb-0">暂无训练记录。</p>
                 {% endif %}
             </div>
         </div>

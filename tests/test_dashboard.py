@@ -4,10 +4,11 @@ from app import (
     COACHES,
     DEMO_EXTENSION_RECORD_COUNT,
     FITNESS_TESTS,
+    FOOTWORK_TRAINING_RECORDS,
     INJURY_RECORDS,
     MATCH_RESULTS,
     PLAYERS,
-    TECHNICAL_TRAINING_RECORDS,
+    TECHNIQUE_TACTIC_TRAINING_RECORDS,
     TRAINING_PLANS,
     app,
     build_home_dashboard_data,
@@ -56,7 +57,8 @@ def test_demo_seed_data_adds_22_more_athletes_and_syncs_dashboard_stats():
     expected_seed_count = (
         (len(PLAYERS) - 4)
         + (len(TRAINING_PLANS) - 2)
-        + len(TECHNICAL_TRAINING_RECORDS)
+        + len(FOOTWORK_TRAINING_RECORDS)
+        + len(TECHNIQUE_TACTIC_TRAINING_RECORDS)
         + (len(FITNESS_TESTS) - 4)
         + (len(INJURY_RECORDS) - 4)
         + (len(MATCH_RESULTS) - 5)
@@ -64,19 +66,21 @@ def test_demo_seed_data_adds_22_more_athletes_and_syncs_dashboard_stats():
     player_ids = {player["id"] for player in PLAYERS}
     coach_ids = {coach["id"] for coach in COACHES}
     dashboard = build_home_dashboard_data()
+    all_training_records = FOOTWORK_TRAINING_RECORDS + TECHNIQUE_TACTIC_TRAINING_RECORDS
 
     assert DEMO_EXTENSION_RECORD_COUNT == 22
     assert ADDITIONAL_ATHLETE_COUNT == 22
     assert expected_seed_count == DEMO_EXTENSION_RECORD_COUNT + ADDITIONAL_DEMO_RECORD_COUNT
     assert len(PLAYERS) == 30
     assert len(TRAINING_PLANS) == 30
-    assert len(TECHNICAL_TRAINING_RECORDS) == 28
+    assert len(FOOTWORK_TRAINING_RECORDS) == 14
+    assert len(TECHNIQUE_TACTIC_TRAINING_RECORDS) == 14
     assert len(FITNESS_TESTS) == 29
     assert len(INJURY_RECORDS) == 14
     assert len(MATCH_RESULTS) == 17
 
     assert {plan["athlete_id"] for plan in TRAINING_PLANS} <= player_ids
-    assert {record["athlete_id"] for record in TECHNICAL_TRAINING_RECORDS} <= player_ids
+    assert {record["athlete_id"] for record in all_training_records} <= player_ids
     assert {test["athlete_id"] for test in FITNESS_TESTS} <= player_ids
     assert {record["athlete_id"] for record in INJURY_RECORDS} <= player_ids
     assert {match["athlete_id"] for match in MATCH_RESULTS} <= player_ids
@@ -84,7 +88,7 @@ def test_demo_seed_data_adds_22_more_athletes_and_syncs_dashboard_stats():
     assert {test["tester_id"] for test in FITNESS_TESTS} <= coach_ids
     assert all(
         any(plan["athlete_id"] == player["id"] for plan in TRAINING_PLANS)
-        and any(record["athlete_id"] == player["id"] for record in TECHNICAL_TRAINING_RECORDS)
+        and any(record["athlete_id"] == player["id"] for record in all_training_records)
         and any(test["athlete_id"] == player["id"] for test in FITNESS_TESTS)
         for player in PLAYERS
         if player["id"] >= 9

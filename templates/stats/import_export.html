@@ -15,10 +15,10 @@
             <div class="row">
                 <div class="col-lg-6">
                     <div class="p-3 border rounded bg-light">
-                        <h5 class="mb-3">专项技术记录导入</h5>
+                        <h5 class="mb-3">步法训练记录导入</h5>
                         <p class="text-muted small mb-3">
-                            支持Excel格式导入，兼容：运动员、训练日期、步法训练、击球技术、多球时长、训练强度、备注<br>
-                            也兼容成员9格式：运动员姓名、训练日期、步法时长、击球得分、多球时长、训练强度
+                            支持 Excel 格式导入，推荐表头：运动员学号、训练日期、步法类型、训练时长(分钟)、训练组数、训练备注<br>
+                            也兼容旧版专项技术模板与成员9格式（自动转换为步法训练记录）
                         </p>
                         <form method="post" action="{{ url_for('stats.import_export') }}" enctype="multipart/form-data">
                             <input type="hidden" name="action" value="import_skill">
@@ -45,7 +45,7 @@
                     <div class="card border-left-primary h-100 py-2">
                         <div class="card-body">
                             <h6 class="font-weight-bold text-primary">全量数据导出</h6>
-                            <p class="small text-muted mb-3">导出训练计划、专项技术、体能测试、伤病记录4个Sheet</p>
+                            <p class="small text-muted mb-3">导出训练计划、步法训练、技战术训练、体能测试、伤病记录 5 个 Sheet</p>
                             <a href="{{ url_for('stats.export_all') }}" class="btn btn-primary btn-sm">一键导出全量</a>
                         </div>
                     </div>
@@ -62,9 +62,9 @@
                 <div class="col-xl-3 col-md-6 mb-3">
                     <div class="card border-left-info h-100 py-2">
                         <div class="card-body">
-                            <h6 class="font-weight-bold text-info">专项技术导出</h6>
-                            <p class="small text-muted mb-3">导出全部专项技术记录数据</p>
-                            <a href="{{ url_for('stats.export_skill') }}" class="btn btn-info btn-sm">导出技术记录</a>
+                            <h6 class="font-weight-bold text-info">步法训练导出</h6>
+                            <p class="small text-muted mb-3">导出全部步法训练记录数据</p>
+                            <a href="{{ url_for('stats.export_skill') }}" class="btn btn-info btn-sm">导出步法训练</a>
                         </div>
                     </div>
                 </div>

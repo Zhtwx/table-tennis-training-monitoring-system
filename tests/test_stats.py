@@ -4,7 +4,7 @@ from copy import deepcopy
 import openpyxl
 
 import app as app_module
-from app import TECHNICAL_TRAINING_RECORDS, app
+from app import FOOTWORK_TRAINING_RECORDS, app
 from tests.helpers import csrf_data
 
 
@@ -39,7 +39,7 @@ def test_stats_export_all_returns_xlsx_workbook():
     assert response.status_code == 200
     assert response.mimetype == "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
     workbook = openpyxl.load_workbook(io.BytesIO(response.data))
-    assert workbook.sheetnames == ["训练计划", "专项技术记录", "体能测试记录", "伤病记录"]
+    assert workbook.sheetnames == ["训练计划", "步法训练记录", "技战术训练记录", "体能测试记录", "伤病记录"]
 
 
 def test_stats_import_accepts_member9_skill_excel_format():
@@ -54,7 +54,7 @@ def test_stats_import_accepts_member9_skill_excel_format():
     workbook.save(payload)
     payload.seek(0)
 
-    before_count = len(TECHNICAL_TRAINING_RECORDS)
+    before_count = len(FOOTWORK_TRAINING_RECORDS)
     try:
         response = client.post(
             "/stats/import-export",
@@ -70,16 +70,13 @@ def test_stats_import_accepts_member9_skill_excel_format():
         )
 
         assert response.status_code == 200
-        assert len(TECHNICAL_TRAINING_RECORDS) == before_count + 1
-        imported = TECHNICAL_TRAINING_RECORDS[-1]
+        assert len(FOOTWORK_TRAINING_RECORDS) == before_count + 1
+        imported = FOOTWORK_TRAINING_RECORDS[-1]
         assert imported["athlete_name"] == "王一鸣"
         assert imported["training_date"] == "2026-07-09"
-        assert imported["multi_ball_minutes"] == 30
-        assert imported["intensity"] == "high"
-        assert imported["hit_score"] == 88
-        assert "步法时长" in imported["note"]
+        assert imported["duration_minutes"] == 45
     finally:
-        del TECHNICAL_TRAINING_RECORDS[before_count:]
+        del FOOTWORK_TRAINING_RECORDS[before_count:]
 
 
 def test_stats_import_creates_player_archive_for_new_names():
@@ -95,7 +92,7 @@ def test_stats_import_creates_player_archive_for_new_names():
     payload.seek(0)
 
     original_players = deepcopy(app_module.PLAYERS)
-    before_count = len(TECHNICAL_TRAINING_RECORDS)
+    before_count = len(FOOTWORK_TRAINING_RECORDS)
     try:
         response = client.post(
             "/stats/import-export",
@@ -111,15 +108,14 @@ def test_stats_import_creates_player_archive_for_new_names():
         )
 
         created_player = next((player for player in app_module.PLAYERS if player["name"] == "小红"), None)
-        imported = TECHNICAL_TRAINING_RECORDS[-1]
+        imported = FOOTWORK_TRAINING_RECORDS[-1]
 
         assert response.status_code == 200
         assert created_player is not None
         assert created_player["student_no"].startswith("IMP")
-        assert len(TECHNICAL_TRAINING_RECORDS) == before_count + 1
+        assert len(FOOTWORK_TRAINING_RECORDS) == before_count + 1
         assert imported["athlete_id"] == created_player["id"]
         assert imported["athlete_name"] == "小红"
-        assert imported["hit_score"] == 82
     finally:
         app_module.PLAYERS[:] = original_players
-        del TECHNICAL_TRAINING_RECORDS[before_count:]
+        del FOOTWORK_TRAINING_RECORDS[before_count:]
