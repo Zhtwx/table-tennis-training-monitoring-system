@@ -55,6 +55,9 @@ FALLBACK_TRAINING_PLANS = [
     {"athlete_id": 2, "coach_id": 2, "start_date": "2026-07-02"},
 ]
 
+GENDER_OPTIONS = ["男", "女"]
+PLAYER_LEVEL_OPTIONS = ["二级运动员", "一级运动员", "国家级", "健将级", "青年队"]
+
 
 def fetch_all(query, params=None):
     connection = get_mysql_connection()
@@ -173,8 +176,95 @@ def fallback_players_for_coach(coach_id):
     return sorted(rows, key=lambda item: item["name"])
 
 
+def normalize_text(value):
+    return str(value or "").strip().lower()
+
+
+def parse_non_negative_int(value):
+    if value is None:
+        return None
+    text = str(value).strip()
+    if not text:
+        return None
+    try:
+        parsed = int(text)
+    except ValueError:
+        return None
+    return parsed if parsed >= 0 else None
+
+
+def build_coach_filters(args):
+    return {
+        "keyword": args.get("keyword", "").strip(),
+        "gender": args.get("gender", "").strip(),
+        "has_players": args.get("has_players", "").strip(),
+        "min_players": parse_non_negative_int(args.get("min_players")),
+    }
+
+
+def build_player_filters(args):
+    return {
+        "keyword": args.get("keyword", "").strip(),
+        "team": args.get("team", "").strip(),
+        "gender": args.get("gender", "").strip(),
+        "skill_level": args.get("skill_level", "").strip(),
+    }
+
+
+def count_active_filters(filters, keys):
+    return sum(1 for key in keys if filters.get(key) not in ("", None))
+
+
+def coach_matches_filters(coach, filters):
+    keyword = normalize_text(filters.get("keyword"))
+    if keyword:
+        haystack = " ".join(
+            normalize_text(coach.get(field)) for field in ("name", "phone", "email", "specialty")
+        )
+        if keyword not in haystack:
+            return False
+
+    if filters.get("gender") and coach.get("gender") != filters["gender"]:
+        return False
+
+    player_count = int(coach.get("player_count") or 0)
+    if filters.get("has_players") == "yes" and player_count <= 0:
+        return False
+    if filters.get("has_players") == "no" and player_count > 0:
+        return False
+
+    min_players = filters.get("min_players")
+    if min_players is not None and player_count < min_players:
+        return False
+
+    return True
+
+
+def player_matches_filters(player, filters):
+    keyword = normalize_text(filters.get("keyword"))
+    if keyword:
+        haystack = " ".join(
+            normalize_text(player.get(field))
+            for field in ("name", "team", "skill_level")
+        )
+        if keyword not in haystack:
+            return False
+
+    if filters.get("team") and filters["team"] not in normalize_text(player.get("team")):
+        return False
+
+    if filters.get("gender") and player.get("gender") != filters["gender"]:
+        return False
+
+    if filters.get("skill_level") and player.get("skill_level") != filters["skill_level"]:
+        return False
+
+    return True
+
+
 @bp.route("/", endpoint="list")
 def list_coaches():
+    filters = build_coach_filters(request.args)
     query = """
         SELECT
             c.id,
@@ -199,7 +289,16 @@ def list_coaches():
         else:
             flash(f"教练员数据暂时不可用：{exc}", "warning")
             coaches = []
-    return render_template("coaches/list.html", coaches=coaches)
+    total_count = len(coaches)
+    coaches = [coach for coach in coaches if coach_matches_filters(coach, filters)]
+    active_condition_count = count_active_filters(filters, ("keyword", "gender", "has_players", "min_players"))
+    return render_template(
+        "coaches/list.html",
+        coaches=coaches,
+        total_count=total_count,
+        active_condition_count=active_condition_count,
+        gender_options=GENDER_OPTIONS,
+    )
 
 
 @bp.route("/add", methods=["GET", "POST"])
@@ -319,6 +418,7 @@ def delete_coach(id):
 
 @bp.route("/<int:id>/players")
 def coach_players(id):
+    filters = build_player_filters(request.args)
     try:
         coach = fetch_one("SELECT id, name FROM coach WHERE id=%s", (id,))
         if not coach:
@@ -354,4 +454,15 @@ def coach_players(id):
             flash(f"队员数据暂时不可用：{exc}", "warning")
             return redirect(url_for("coaches.list"))
 
-    return render_template("coaches/players.html", coach=coach, players=players)
+    total_count = len(players)
+    players = [player for player in players if player_matches_filters(player, filters)]
+    active_condition_count = count_active_filters(filters, ("keyword", "team", "gender", "skill_level"))
+    return render_template(
+        "coaches/players.html",
+        coach=coach,
+        players=players,
+        total_count=total_count,
+        active_condition_count=active_condition_count,
+        gender_options=GENDER_OPTIONS,
+        skill_level_options=PLAYER_LEVEL_OPTIONS,
+    )

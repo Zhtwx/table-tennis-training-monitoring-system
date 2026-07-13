@@ -1,20 +1,68 @@
 {% extends "base.html" %}
 
-{% block title %}{{ coach.name }} 的运动员 - 乒乓球运动员综合训练监控管理系统{% endblock %}
+{% block title %}{{ coach.name }} 的旗下队员 - 乒乓球运动员综合训练监控管理系统{% endblock %}
 
 {% block content %}
 <div class="d-flex flex-column flex-xl-row align-items-xl-end justify-content-between gap-3 mb-4">
     <div>
-        <h1 class="page-title h3 mb-2">{{ coach.name }} - 关联运动员</h1>
-        <p class="text-secondary mb-0">查看该教练员参与训练计划的运动员基础档案和最近训练情况。</p>
+        <h1 class="page-title h3 mb-2">{{ coach.name }} - 旗下队员</h1>
+        <p class="text-secondary mb-0">查看该教练员旗下队员基础档案和最近训练情况，支持多条件筛查。</p>
     </div>
     <a href="{{ url_for('coaches.list') }}" class="btn btn-outline-secondary">返回教练员列表</a>
 </div>
 
+<div class="card shadow-sm mb-4">
+    <div class="card-header bg-white border-0 pt-4 px-4">
+        <h2 class="h5 mb-1">筛查条件</h2>
+        <p class="text-secondary small mb-0">支持按姓名、队伍、性别和运动等级筛查旗下队员。</p>
+    </div>
+    <div class="card-body">
+        <form class="row g-3 align-items-end" method="get" action="{{ url_for('coaches.coach_players', id=coach.id) }}">
+            <div class="col-12 col-md-4">
+                <label for="keyword" class="form-label">关键词</label>
+                <input type="text" class="form-control" id="keyword" name="keyword"
+                       value="{{ request.args.get('keyword', '') }}" placeholder="姓名、队伍或等级">
+            </div>
+            <div class="col-12 col-md-3">
+                <label for="team" class="form-label">队伍</label>
+                <input type="text" class="form-control" id="team" name="team"
+                       value="{{ request.args.get('team', '') }}" placeholder="例如：一队">
+            </div>
+            <div class="col-6 col-md-2">
+                <label for="gender" class="form-label">性别</label>
+                <select class="form-select" id="gender" name="gender">
+                    <option value="">不限</option>
+                    {% for gender in gender_options %}
+                        <option value="{{ gender }}" {% if request.args.get('gender') == gender %}selected{% endif %}>{{ gender }}</option>
+                    {% endfor %}
+                </select>
+            </div>
+            <div class="col-6 col-md-2">
+                <label for="skill_level" class="form-label">运动等级</label>
+                <select class="form-select" id="skill_level" name="skill_level">
+                    <option value="">不限</option>
+                    {% for level in skill_level_options %}
+                        <option value="{{ level }}" {% if request.args.get('skill_level') == level %}selected{% endif %}>{{ level }}</option>
+                    {% endfor %}
+                </select>
+            </div>
+            <div class="col-6 col-md-1 d-grid">
+                <button type="submit" class="btn btn-primary">查询</button>
+            </div>
+            <div class="col-6 col-md-1 d-grid">
+                <a href="{{ url_for('coaches.coach_players', id=coach.id) }}" class="btn btn-outline-secondary">重置</a>
+            </div>
+        </form>
+        <div class="mt-3 text-secondary small">
+            当前命中 {{ players|length }} 条，共 {{ total_count }} 条；启用 {{ active_condition_count }} 个查询条件。
+        </div>
+    </div>
+</div>
+
 <div class="card">
     <div class="card-header p-4">
-        <h2 class="h5 mb-1">运动员列表</h2>
-        <p class="text-secondary small mb-0">共 {{ players|length }} 名运动员。</p>
+        <h2 class="h5 mb-1">旗下队员列表</h2>
+        <p class="text-secondary small mb-0">共 {{ players|length }} 名队员。</p>
     </div>
     <div class="card-body p-0">
         <div class="table-responsive">
@@ -41,7 +89,7 @@
                     </tr>
                     {% else %}
                     <tr>
-                        <td colspan="6" class="text-center text-secondary py-5">该教练员暂无关联运动员。</td>
+                        <td colspan="6" class="text-center text-secondary py-5">该教练员暂无旗下队员。</td>
                     </tr>
                     {% endfor %}
                 </tbody>

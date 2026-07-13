@@ -69,6 +69,49 @@ def test_coach_form_page_renders():
     assert "教练员" in response.get_data(as_text=True)
 
 
+def test_coach_list_supports_screening(monkeypatch):
+    import coaches.routes as coach_routes
+
+    sample_rows = [
+        {
+            "id": 1,
+            "name": "张教练",
+            "gender": "男",
+            "phone": "13800000001",
+            "email": "zhang@example.com",
+            "specialty": "乒乓球专项训练",
+            "hire_date": "2026-07-01",
+            "player_count": 2,
+            "latest_training_date": "2026-07-08",
+        },
+        {
+            "id": 2,
+            "name": "李教练",
+            "gender": "女",
+            "phone": "13800000002",
+            "email": "li@example.com",
+            "specialty": "体能训练与康复",
+            "hire_date": "2026-07-02",
+            "player_count": 0,
+            "latest_training_date": None,
+        },
+    ]
+
+    monkeypatch.setattr(coach_routes, "fetch_all", lambda query, params=None: sample_rows)
+
+    client = app.test_client()
+    login(client)
+
+    response = client.get("/coaches/?keyword=张&has_players=yes")
+    body = response.get_data(as_text=True)
+
+    assert response.status_code == 200
+    assert "张教练" in body
+    assert "李教练" not in body
+    assert "当前命中 1 条" in body
+    assert "启用 2 个查询条件" in body
+
+
 def test_coach_players_page_renders(monkeypatch):
     import coaches.routes as coach_routes
 
@@ -100,3 +143,49 @@ def test_coach_players_page_renders(monkeypatch):
 
     assert response.status_code == 200
     assert "王一鸣" in response.get_data(as_text=True)
+
+
+def test_coach_players_page_supports_screening(monkeypatch):
+    import coaches.routes as coach_routes
+
+    monkeypatch.setattr(
+        coach_routes,
+        "fetch_one",
+        lambda query, params=None: {"id": 1, "name": "张教练"},
+    )
+    monkeypatch.setattr(
+        coach_routes,
+        "fetch_all",
+        lambda query, params=None: [
+            {
+                "id": 1,
+                "name": "王一鸣",
+                "gender": "男",
+                "birth_date": "2007-03-10",
+                "team": "一队",
+                "skill_level": "一级运动员",
+                "latest_training_date": "2026-07-08",
+            },
+            {
+                "id": 2,
+                "name": "李清扬",
+                "gender": "女",
+                "birth_date": "2008-05-21",
+                "team": "二队",
+                "skill_level": "二级运动员",
+                "latest_training_date": "2026-07-04",
+            },
+        ],
+    )
+
+    client = app.test_client()
+    login(client)
+
+    response = client.get("/coaches/1/players?keyword=王&team=一队&skill_level=一级运动员")
+    body = response.get_data(as_text=True)
+
+    assert response.status_code == 200
+    assert "王一鸣" in body
+    assert "李清扬" not in body
+    assert "当前命中 1 条" in body
+    assert "启用 3 个查询条件" in body
