@@ -254,6 +254,86 @@
     </div>
 </div>
 
+<div class="card shadow-sm mb-4">
+    <div class="card-header bg-white border-0 pt-4 px-4">
+        <h2 class="h5 mb-1">三段法技战术分析</h2>
+        <p class="text-secondary small mb-0">仅录入原始得分/失分并计算比例；当前标准待核验，不生成正式评级。</p>
+    </div>
+    <div class="card-body">
+        <form method="post" id="analysisForm" class="row g-3">
+            <input type="hidden" name="analysis_method" value="three_phase">
+            <input type="hidden" name="status" value="confirmed">
+            <div class="col-12 col-md-4">
+                <label for="analysis_match_id" class="form-label">选择比赛</label>
+                <select class="form-select" id="analysis_match_id" required>
+                    <option value="">请选择比赛</option>
+                    {% for record in match_records %}
+                        <option value="{{ record.id }}">{{ record.match_date }} · {{ record.player_name }} · {{ record.match_name }}</option>
+                    {% endfor %}
+                </select>
+            </div>
+            {% for phase in phase_options %}
+            <div class="col-12 col-md-2">
+                <label class="form-label">{{ phase.label }}得分</label>
+                <input type="number" class="form-control" name="{{ phase.code }}_points_won" min="0" value="0" required>
+            </div>
+            <div class="col-12 col-md-2">
+                <label class="form-label">{{ phase.label }}失分</label>
+                <input type="number" class="form-control" name="{{ phase.code }}_points_lost" min="0" value="0" required>
+            </div>
+            {% endfor %}
+            <div class="col-12">
+                <label for="coach_summary" class="form-label">教练人工复盘结论</label>
+                <textarea class="form-control" id="coach_summary" name="coach_summary" rows="2" placeholder="只填写人工确认结论，不自动生成训练处方"></textarea>
+            </div>
+            <div class="col-12 d-flex justify-content-end">
+                <button type="submit" class="btn btn-primary">保存分析</button>
+            </div>
+        </form>
+    </div>
+</div>
+
+<div class="card shadow-sm mb-4">
+    <div class="card-header bg-white border-0 pt-4 px-4">
+        <h2 class="h5 mb-1">技战术分析记录</h2>
+        <p class="text-secondary small mb-0">标准待核验时仅展示计算值，不展示等级。</p>
+    </div>
+    <div class="card-body">
+        {% for analysis in analysis_records %}
+            <div class="border rounded-3 p-3 mb-3">
+                <div class="d-flex flex-column flex-md-row justify-content-between gap-2">
+                    <div>
+                        <div class="fw-semibold">{{ analysis.match_name }}</div>
+                        <div class="small text-secondary">{{ analysis.athlete_name }} · 第 {{ analysis.version_no }} 版 · {{ analysis.status_label }}</div>
+                    </div>
+                    <span class="badge text-bg-warning align-self-start">标准待核验</span>
+                </div>
+                <div class="row g-3 mt-2">
+                    {% for stat in analysis.stats %}
+                    <div class="col-12 col-md-4">
+                        <div class="border rounded-3 p-3 h-100 bg-light">
+                            <div class="fw-semibold">{{ stat.phase_label }}</div>
+                            <div class="small text-secondary">得分 {{ stat.points_won }} / 失分 {{ stat.points_lost }}</div>
+                            {% if stat.display_note %}
+                                <div class="text-secondary small mt-2">{{ stat.display_note }}</div>
+                            {% else %}
+                                <div class="small mt-2">得分率 {{ stat.scoring_rate }}% · 使用率 {{ stat.usage_rate }}%</div>
+                            {% endif %}
+                            <div class="small text-secondary mt-1">评级：待核验</div>
+                        </div>
+                    </div>
+                    {% endfor %}
+                </div>
+                {% if analysis.coach_summary %}
+                    <div class="small mt-3">教练结论：{{ analysis.coach_summary }}</div>
+                {% endif %}
+            </div>
+        {% else %}
+            <div class="text-secondary text-center py-4">暂无技战术分析记录。</div>
+        {% endfor %}
+    </div>
+</div>
+
 <div class="card shadow-sm">
     <div class="card-header bg-white border-0 pt-4 px-4">
         <h2 class="h5 mb-1">成绩与技战术复盘</h2>
@@ -301,6 +381,8 @@
                         <td><span class="badge text-bg-{{ record.result_class }}">{{ record.result }}</span></td>
                         <td class="text-end text-nowrap">
                             <a href="{{ url_for('matches.list', edit_id=record.id) }}" class="btn btn-sm btn-outline-primary">修改</a>
+                            <a href="{{ url_for('training.plans', source_type='match', source_match_id=record.id, athlete_id=record.athlete_id) }}"
+                               class="btn btn-sm btn-outline-success">制定训练计划</a>
                         </td>
                     </tr>
                     {% else %}
@@ -334,6 +416,18 @@
         if (opponentSource) {
             opponentSource.addEventListener('change', syncOpponentFields);
             syncOpponentFields();
+        }
+
+        const analysisForm = document.getElementById('analysisForm');
+        const analysisMatch = document.getElementById('analysis_match_id');
+        if (analysisForm && analysisMatch) {
+            analysisForm.addEventListener('submit', function (event) {
+                if (!analysisMatch.value) {
+                    event.preventDefault();
+                    return;
+                }
+                analysisForm.action = "{{ url_for('matches.list') }}".replace(/\/$/, '') + "/" + analysisMatch.value + "/analysis";
+            });
         }
 
         const chartEl = document.getElementById('matchResultChart');

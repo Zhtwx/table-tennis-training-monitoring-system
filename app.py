@@ -29,22 +29,72 @@ from auth_utils import (
 from repositories import training_repository as training_repo
 from security import AUDIT_LOGS, csrf_token, record_audit_log, validate_csrf_token
 
-NAV_ITEMS = [
-    {"label": "综合看板", "endpoint": "index", "roles": {"admin", "coach"}},
-    {"label": "运动员档案", "endpoint": "players.list", "roles": {"admin", "coach"}},
-    {"label": "教练员信息", "endpoint": "coaches.list", "roles": {"admin", "coach"}},
-    {"label": "训练计划", "endpoint": "training.plans", "roles": {"admin", "coach"}},
-    {"label": "步法训练", "endpoint": "training.footwork", "roles": {"admin", "coach"}},
-    {"label": "技战术训练", "endpoint": "training.technique_tactic", "roles": {"admin", "coach"}},
-    {"label": "体能测试", "endpoint": "fitness.tests", "roles": {"admin", "coach"}},
-    {"label": "伤病记录", "endpoint": "injuries.list", "roles": {"admin", "coach"}},
-    {"label": "数据统计", "endpoint": "stats.dashboard", "roles": {"admin", "coach"}},
-    {"label": "导入导出", "endpoint": "stats.import_export", "roles": {"admin", "coach"}},
-    {"label": "康复跟踪", "endpoint": "rehab.list", "roles": {"admin", "coach"}},
-    {"label": "比赛成绩", "endpoint": "matches.list", "roles": {"admin", "coach"}},
-    {"label": "用户权限", "endpoint": "auth.users", "roles": {"admin"}},
-    {"label": "系统配置", "endpoint": "settings.dictionary", "roles": {"admin"}},
+NAV_GROUPS = [
+    {
+        "label": "训练业务",
+        "items": [
+            {"label": "比赛成绩", "endpoint": "matches.list", "roles": {"admin", "coach"}},
+            {"label": "训练计划", "endpoint": "training.plans", "roles": {"admin", "coach"}},
+            {"label": "体能训练", "endpoint": "fitness.training", "roles": {"admin", "coach"}},
+            {"label": "步法训练", "endpoint": "training.footwork", "roles": {"admin", "coach"}},
+            {"label": "技战术训练", "endpoint": "training.technique_tactic", "roles": {"admin", "coach"}},
+        ],
+    },
+    {
+        "label": "人员与状态",
+        "items": [
+            {"label": "运动员档案", "endpoint": "players.list", "roles": {"admin", "coach"}},
+            {"label": "教练员信息", "endpoint": "coaches.list", "roles": {"admin", "coach"}},
+            {
+                "label": "运动员身体状态",
+                "children": [
+                    {"label": "伤病记录", "endpoint": "injuries.list", "roles": {"admin", "coach"}},
+                    {"label": "康复跟踪", "endpoint": "rehab.list", "roles": {"admin", "coach"}},
+                ],
+            },
+        ],
+    },
+    {
+        "label": "数据与管理",
+        "items": [
+            {"label": "数据统计", "endpoint": "stats.dashboard", "roles": {"admin", "coach"}},
+            {"label": "导入导出", "endpoint": "stats.import_export", "roles": {"admin", "coach"}},
+            {"label": "用户权限", "endpoint": "auth.users", "roles": {"admin"}},
+        ],
+    },
 ]
+
+
+def build_navigation_for_role(role):
+    nav_groups = []
+    nav_items = []
+    for group in NAV_GROUPS:
+        visible_items = []
+        for item in group["items"]:
+            item_roles = item.get("roles", set())
+            if role not in item_roles and "children" not in item:
+                continue
+
+            visible_item = {key: value for key, value in item.items() if key != "children"}
+            children = item.get("children")
+            if children:
+                visible_children = [
+                    {key: value for key, value in child.items()}
+                    for child in children
+                    if role in child.get("roles", set())
+                ]
+                if not visible_children:
+                    continue
+                visible_item["children"] = visible_children
+                nav_items.extend(visible_children)
+            else:
+                nav_items.append(visible_item)
+            visible_items.append(visible_item)
+
+        if visible_items:
+            nav_groups.append({"label": group["label"], "items": visible_items})
+
+    return nav_groups, nav_items
 
 PLAYERS = [
     {
@@ -134,6 +184,16 @@ TRAINING_PLANS = [
     },
 ]
 PLAN_ID_COUNTER = 3
+TRAINING_PLAN_ITEMS = []
+PLAN_ITEM_ID_COUNTER = 1
+TRAINING_PLAN_STATUS_LABELS = {
+    "draft": "草稿",
+    "published": "已发布",
+    "running": "执行中",
+    "completed": "已完成",
+    "cancelled": "已取消",
+}
+EXECUTABLE_PLAN_STATUSES = {"published", "running", "completed"}
 
 FOOTWORK_TRAINING_RECORDS = training_repo.MEMORY_FOOTWORK_RECORDS
 TECHNIQUE_TACTIC_TRAINING_RECORDS = training_repo.MEMORY_TECHNIQUE_TACTIC_RECORDS
@@ -448,6 +508,10 @@ MATCH_RESULTS = [
         "improvement": "膝伤恢复期不安排长回合对拉。",
     },
 ]
+MATCH_TACTICAL_ANALYSES = []
+MATCH_PHASE_STATS = []
+MATCH_ANALYSIS_ID_COUNTER = 1
+MATCH_PHASE_STAT_ID_COUNTER = 1
 
 DEMO_PLAYERS = [
     {
@@ -1070,11 +1134,10 @@ def create_app():
     def inject_layout_data():
         user = current_user()
         role = user["role"] if user else None
-        visible_nav_items = [
-            item for item in NAV_ITEMS if role and role in item["roles"]
-        ]
+        visible_nav_groups, visible_nav_items = build_navigation_for_role(role) if role else ([], [])
         return {
             "current_user": user,
+            "nav_groups": visible_nav_groups,
             "nav_items": visible_nav_items,
             "csrf_token": csrf_token,
         }
@@ -1111,7 +1174,7 @@ def create_app():
                 session["username"] = username
                 flash(f"欢迎回来，{user['name']}。", "success")
                 requested_next = request.args.get("next")
-                next_url = requested_next if is_safe_redirect_url(requested_next) else url_for("index")
+                next_url = requested_next if is_safe_redirect_url(requested_next) else url_for("matches.list")
                 return redirect(next_url)
 
             flash("用户名或密码错误，请重新输入。", "danger")
@@ -1127,7 +1190,7 @@ def create_app():
     @app.route("/")
     @role_required("admin", "coach")
     def index():
-        return render_template("index.html", dashboard=build_home_dashboard_data())
+        return redirect(url_for("matches.list"))
 
     players_bp = Blueprint("players", __name__, url_prefix="/players")
 
@@ -1275,6 +1338,32 @@ def create_app():
     @role_required("admin", "coach")
     def training_plans():
         """训练计划列表、查询、新增"""
+        source_match = None
+        source_analysis = None
+        source_analysis_id = ""
+        source_notice = ""
+        source_type = ""
+        source_match_id = ""
+        source_summary = ""
+        default_athlete_id = request.args.get("athlete_id", "").strip()
+        default_coach_id = request.args.get("coach_id", "").strip()
+
+        if request.method == "GET":
+            source_type = request.args.get("source_type", "").strip()
+            source_match_id = request.args.get("source_match_id", "").strip()
+            if source_type == "match" and source_match_id.isdigit():
+                source_match = get_match_record(int(source_match_id))
+                if source_match:
+                    default_athlete_id = str(source_match["athlete_id"])
+                    source_analysis = get_latest_confirmed_analysis_for_match(source_match["id"])
+                    if source_analysis:
+                        source_type = "match_analysis"
+                        source_analysis_id = str(source_analysis["id"])
+                        source_summary = build_match_analysis_plan_source_summary(source_analysis)
+                    else:
+                        source_summary = build_match_plan_source_summary(source_match)
+                        source_notice = "暂无已确认技战术分析，仅可作为比赛结果来源；需先完成分析确认后再作为普通改进计划依据。"
+
         if request.method == "POST":
             athlete_id = request.form.get("athlete_id")
             coach_id = request.form.get("coach_id")
@@ -1283,9 +1372,42 @@ def create_app():
             intensity = request.form.get("intensity")
             duration = request.form.get("duration")
             location = request.form.get("location")
+            plan_status = request.form.get("plan_status", "draft").strip() or "draft"
+            source_type = request.form.get("source_type", "").strip()
+            source_match_id = request.form.get("source_match_id", "").strip()
+            source_analysis_id = request.form.get("source_analysis_id", "").strip()
+            source_summary = request.form.get("source_summary", "").strip()
+            plan_items, item_errors = parse_training_plan_items(request.form)
+
+            if source_type == "match_analysis" and source_analysis_id.isdigit():
+                source_analysis = get_match_analysis(int(source_analysis_id))
+                if source_analysis and source_analysis["status"] == "confirmed":
+                    source_match = get_match_record(source_analysis["match_id"])
+                    source_match_id = str(source_analysis["match_id"])
+                    if not source_summary:
+                        source_summary = build_match_analysis_plan_source_summary(source_analysis)
+                else:
+                    item_errors.append("只有已确认技战术分析可以作为普通改进训练计划来源。")
+            elif source_type == "match" and source_match_id.isdigit():
+                source_match = get_match_record(int(source_match_id))
+                if source_match and not source_summary:
+                    source_summary = build_match_plan_source_summary(source_match)
 
             # 🔽 调用校验函数
             errors = validate_training_plan_data(athlete_id, coach_id, plan_datetime, content, intensity, duration)
+            errors.extend(item_errors)
+            if plan_status not in TRAINING_PLAN_STATUS_LABELS:
+                errors.append("训练计划状态非法。")
+            else:
+                errors.extend(validate_training_plan_status_choice(plan_status, plan_items))
+            if (
+                source_type == "match_analysis"
+                and source_match
+                and athlete_id
+                and athlete_id.isdigit()
+                and source_match["athlete_id"] != int(athlete_id)
+            ):
+                errors.append("训练计划运动员必须与来源比赛运动员一致。")
             
             if errors:
                 for err in errors:
@@ -1298,9 +1420,10 @@ def create_app():
                 flash("运动员或教练不存在", "danger")
                 return redirect(url_for("training.plans"))
 
-            global PLAN_ID_COUNTER
+            global PLAN_ID_COUNTER, PLAN_ITEM_ID_COUNTER
+            new_plan_id = PLAN_ID_COUNTER
             new_plan = {
-                        "id": PLAN_ID_COUNTER,
+                        "id": new_plan_id,
                         "athlete_id": int(athlete_id),
                         "athlete_name": athlete["name"],
                         "coach_id": int(coach_id),
@@ -1310,8 +1433,23 @@ def create_app():
                         "intensity": intensity,
                         "duration": int(duration) if duration else 60,
                         "location": location or "",
+                        "status": plan_status,
+                        "status_label": TRAINING_PLAN_STATUS_LABELS[plan_status],
+                        "source_type": source_type,
+                        "source_match_id": int(source_match_id) if source_match_id.isdigit() else None,
+                        "source_analysis_id": int(source_analysis_id) if source_analysis_id.isdigit() else None,
+                        "source_summary": source_summary,
                     }
             TRAINING_PLANS.append(new_plan)
+            for item in plan_items:
+                TRAINING_PLAN_ITEMS.append(
+                    {
+                        "id": PLAN_ITEM_ID_COUNTER,
+                        "plan_id": new_plan_id,
+                        **item,
+                    }
+                )
+                PLAN_ITEM_ID_COUNTER += 1
             PLAN_ID_COUNTER += 1
             flash("训练计划添加成功", "success")
             return redirect(url_for("training.plans"))
@@ -1343,6 +1481,25 @@ def create_app():
             start_date=start_date,
             end_date=end_date,
             content=content_keyword,
+            default_athlete_id=default_athlete_id,
+            default_coach_id=default_coach_id,
+            source_match=source_match,
+            source_analysis=source_analysis,
+            source_analysis_id=source_analysis_id,
+            source_notice=source_notice,
+            source_type=source_type,
+            source_match_id=source_match_id,
+            source_summary=source_summary,
+            plan_items_by_plan_id=group_training_plan_items_by_plan(),
+            item_module_options=[
+                {"value": value, "label": label}
+                for value, label in TRAINING_PLAN_ITEM_MODULE_LABELS.items()
+            ],
+            plan_status_options=[
+                {"value": value, "label": label}
+                for value, label in TRAINING_PLAN_STATUS_LABELS.items()
+            ],
+            plan_status_labels=TRAINING_PLAN_STATUS_LABELS,
         )
    
     @training_bp.route("/plans/<int:plan_id>/edit", methods=["GET", "POST"])
@@ -1362,20 +1519,45 @@ def create_app():
             intensity = request.form.get("intensity")
             duration = request.form.get("duration")
             location = request.form.get("location")
+            plan_status = request.form.get("plan_status", plan.get("status", "published")).strip() or plan.get("status", "published")
 
             # 🔽 调用统一的校验函数
             errors = validate_training_plan_data(athlete_id, coach_id, plan_datetime, content, intensity, duration)
+            if plan_status not in TRAINING_PLAN_STATUS_LABELS:
+                errors.append("训练计划状态非法。")
+            else:
+                errors.extend(validate_training_plan_status_choice(plan_status, get_training_plan_items(plan["id"])))
             if errors:
                 for err in errors:
                     flash(err, "danger")
-                return render_template("training/plan_form.html", plan=plan, athletes=PLAYERS, coaches=COACHES)
+                return render_template(
+                    "training/plan_form.html",
+                    plan=plan,
+                    athletes=PLAYERS,
+                    coaches=COACHES,
+                    plan_status_options=[
+                        {"value": value, "label": label}
+                        for value, label in TRAINING_PLAN_STATUS_LABELS.items()
+                    ],
+                    plan_status_labels=TRAINING_PLAN_STATUS_LABELS,
+                )
 
             # 查找运动员和教练（保留原有逻辑）
             athlete = next((p for p in PLAYERS if str(p["id"]) == athlete_id), None)
             coach = next((c for c in COACHES if str(c["id"]) == coach_id), None)
             if not athlete or not coach:
                 flash("运动员或教练不存在", "danger")
-                return render_template("training/plan_form.html", plan=plan, athletes=PLAYERS, coaches=COACHES)
+                return render_template(
+                    "training/plan_form.html",
+                    plan=plan,
+                    athletes=PLAYERS,
+                    coaches=COACHES,
+                    plan_status_options=[
+                        {"value": value, "label": label}
+                        for value, label in TRAINING_PLAN_STATUS_LABELS.items()
+                    ],
+                    plan_status_labels=TRAINING_PLAN_STATUS_LABELS,
+                )
 
             # 更新计划（保留原有逻辑）
             plan.update({
@@ -1388,11 +1570,22 @@ def create_app():
                 "intensity": intensity,
                 "duration": int(duration) if duration else 60,
                 "location": location or "",
+                "status": plan_status,
             })
             flash("训练计划更新成功", "success")
             return redirect(url_for("training.plans"))
 
-        return render_template("training/plan_form.html", plan=plan, athletes=PLAYERS, coaches=COACHES)
+        return render_template(
+            "training/plan_form.html",
+            plan=plan,
+            athletes=PLAYERS,
+            coaches=COACHES,
+            plan_status_options=[
+                {"value": value, "label": label}
+                for value, label in TRAINING_PLAN_STATUS_LABELS.items()
+            ],
+            plan_status_labels=TRAINING_PLAN_STATUS_LABELS,
+        )
 
 
     @training_bp.route("/plans/<int:plan_id>/delete", methods=["POST"])
@@ -1451,6 +1644,7 @@ def create_app():
             total_count=training_repo.count_footwork_records(),
             filtered_count=filtered_count,
             active_condition_count=active_condition_count,
+            module_plan_items=build_execution_frame_items("footwork"),
             pagination={
                 "page": page,
                 "page_size": page_size,
@@ -1519,6 +1713,7 @@ def create_app():
             landing_options=get_landing_options(),
             landing_concentration_options=LANDING_CONCENTRATION_OPTIONS,
             serve_frequency_options=SERVE_FREQUENCY_OPTIONS,
+            module_plan_items=build_execution_frame_items("technique_tactic"),
             pagination={
                 "page": page,
                 "page_size": page_size,
@@ -1895,6 +2090,17 @@ def create_app():
 
     fitness_bp = Blueprint("fitness", __name__, url_prefix="/fitness")
 
+    @fitness_bp.route("/training", endpoint="training")
+    @role_required("admin", "coach")
+    def fitness_training():
+        items = build_execution_frame_items("fitness")
+        return render_template(
+            "fitness/training.html",
+            pending_items=[item for item in items if item["status"] == "pending"],
+            running_items=[item for item in items if item["status"] == "running"],
+            completed_items=[item for item in items if item["status"] == "completed"],
+        )
+
     @fitness_bp.route("/tests", methods=["GET", "POST"], endpoint="tests")
     @role_required("admin", "coach")
     def fitness_tests():
@@ -1983,7 +2189,22 @@ def create_app():
             ],
             editing_record=editing_record,
             athlete_choices=PLAYERS,
+            analysis_records=build_match_analysis_view_models(),
+            phase_options=[
+                {"code": code, "label": label}
+                for code, label in THREE_PHASE_LABELS.items()
+            ],
         )
+
+    @matches_bp.route("/<int:match_id>/analysis", methods=["POST"], endpoint="analysis")
+    @role_required("admin", "coach")
+    def matches_analysis(match_id):
+        try:
+            save_match_tactical_analysis(match_id, request.form, current_user()["username"])
+            flash("比赛技战术分析已保存，当前标准待核验，未生成正式评级。", "success")
+        except ValidationError as exc:
+            flash(str(exc), "danger")
+        return redirect(url_for("matches.list"))
 
     auth_bp = Blueprint("auth", __name__, url_prefix="/auth")
 
@@ -2394,6 +2615,287 @@ def save_match_record(form):
     if not target:
         raise ValidationError("要修改的比赛成绩不存在。")
     target.update(validated)
+
+
+def get_match_record(match_id):
+    return next((item for item in MATCH_RESULTS if item["id"] == match_id), None)
+
+
+def next_match_analysis_version(match_id):
+    versions = [
+        analysis["version_no"]
+        for analysis in MATCH_TACTICAL_ANALYSES
+        if analysis["match_id"] == match_id
+    ]
+    return max(versions, default=0) + 1
+
+
+def get_match_analysis(analysis_id):
+    return next((item for item in MATCH_TACTICAL_ANALYSES if item["id"] == analysis_id), None)
+
+
+def get_latest_confirmed_analysis_for_match(match_id):
+    confirmed = [
+        analysis
+        for analysis in MATCH_TACTICAL_ANALYSES
+        if analysis["match_id"] == match_id and analysis["status"] == "confirmed"
+    ]
+    return max(confirmed, key=lambda item: (item["version_no"], item["id"]), default=None)
+
+
+def save_match_tactical_analysis(match_id, form, operator):
+    match = get_match_record(match_id)
+    if not match:
+        raise ValidationError("比赛记录不存在。")
+    analysis_method = form.get("analysis_method", "").strip() or "three_phase"
+    if analysis_method != "three_phase":
+        raise ValidationError("当前仅开放三段法录入框架。")
+    status = form.get("status", "").strip() or "draft"
+    if status not in {"draft", "confirmed"}:
+        raise ValidationError("分析状态只能为草稿或已确认。")
+
+    phase_inputs = []
+    for phase_code in THREE_PHASE_LABELS:
+        phase_inputs.append(
+            {
+                "phase_code": phase_code,
+                "points_won": form.get(f"{phase_code}_points_won", "0"),
+                "points_lost": form.get(f"{phase_code}_points_lost", "0"),
+            }
+        )
+    phase_stats = calculate_three_phase_stats(phase_inputs, standard_verified=False)
+
+    global MATCH_ANALYSIS_ID_COUNTER, MATCH_PHASE_STAT_ID_COUNTER
+    analysis_id = MATCH_ANALYSIS_ID_COUNTER
+    MATCH_ANALYSIS_ID_COUNTER += 1
+    analysis = {
+        "id": analysis_id,
+        "match_id": match_id,
+        "analysis_method": analysis_method,
+        "version_no": next_match_analysis_version(match_id),
+        "status": status,
+        "coach_summary": form.get("coach_summary", "").strip(),
+        "standard_verification_status": "pending",
+        "created_by": operator,
+    }
+    MATCH_TACTICAL_ANALYSES.append(analysis)
+    for stat in phase_stats:
+        MATCH_PHASE_STATS.append(
+            {
+                "id": MATCH_PHASE_STAT_ID_COUNTER,
+                "analysis_id": analysis_id,
+                **stat,
+            }
+        )
+        MATCH_PHASE_STAT_ID_COUNTER += 1
+    return analysis
+
+
+def build_match_analysis_view_models():
+    views = []
+    for analysis in MATCH_TACTICAL_ANALYSES:
+        match = get_match_record(analysis["match_id"])
+        stats = [
+            stat
+            for stat in MATCH_PHASE_STATS
+            if stat["analysis_id"] == analysis["id"]
+        ]
+        views.append(
+            {
+                **analysis,
+                "match_name": match["match_name"] if match else "未知比赛",
+                "athlete_name": find_player(match["athlete_id"])["name"] if match and find_player(match["athlete_id"]) else "未知运动员",
+                "status_label": "已确认" if analysis["status"] == "confirmed" else "草稿",
+                "stats": stats,
+            }
+        )
+    return sorted(views, key=lambda item: item["id"], reverse=True)
+
+
+def build_match_plan_source_summary(match):
+    return f"{match['match_name']} · {match['result']} {match['score']}"
+
+
+def build_match_analysis_plan_source_summary(analysis):
+    match = get_match_record(analysis["match_id"])
+    match_summary = build_match_plan_source_summary(match) if match else "未知比赛"
+    coach_summary = analysis.get("coach_summary") or "教练未填写结论"
+    return f"{match_summary} · 已确认技战术分析 V{analysis['version_no']} · 标准待核验 · {coach_summary}"
+
+
+THREE_PHASE_LABELS = {
+    "serve_attack": "发抢段",
+    "receive_attack": "接抢段",
+    "rally": "相持段",
+}
+
+
+def calculate_three_phase_stats(phase_inputs, standard_verified=False):
+    normalized = []
+    total_points = 0
+    for item in phase_inputs:
+        phase_code = item["phase_code"]
+        try:
+            points_won = int(item["points_won"])
+            points_lost = int(item["points_lost"])
+        except (TypeError, ValueError):
+            raise ValidationError("三段法得分和失分必须为非负整数。")
+        if points_won < 0 or points_lost < 0:
+            raise ValidationError("三段法得分和失分必须为非负整数。")
+        phase_total = points_won + points_lost
+        total_points += phase_total
+        normalized.append(
+            {
+                "phase_code": phase_code,
+                "phase_label": THREE_PHASE_LABELS.get(phase_code, phase_code),
+                "points_won": points_won,
+                "points_lost": points_lost,
+                "phase_total": phase_total,
+            }
+        )
+
+    result = []
+    for item in normalized:
+        phase_total = item["phase_total"]
+        scoring_rate = round(item["points_won"] / phase_total * 100, 2) if phase_total else None
+        usage_rate = round(phase_total / total_points * 100, 2) if phase_total and total_points else None
+        enriched = dict(item)
+        enriched.update(
+            {
+                "scoring_rate": scoring_rate,
+                "usage_rate": usage_rate,
+                "usage_denominator_source": "三段得失分合计" if total_points else "",
+                "evaluation_level": None if not standard_verified else None,
+                "display_note": "无该段数据" if phase_total == 0 else "",
+            }
+        )
+        result.append(enriched)
+    return result
+
+
+TRAINING_PLAN_ITEM_MODULE_LABELS = {
+    "fitness": "体能训练",
+    "footwork": "步法训练",
+    "technique_tactic": "技战术训练",
+}
+
+
+def parse_training_plan_items(form):
+    module_types = form.getlist("item_module_type")
+    titles = form.getlist("item_title")
+    targets = form.getlist("item_target_description")
+    sessions = form.getlist("item_planned_sessions")
+    minutes = form.getlist("item_planned_minutes")
+    intensities = form.getlist("item_intensity")
+    max_len = max(
+        len(module_types),
+        len(titles),
+        len(targets),
+        len(sessions),
+        len(minutes),
+        len(intensities),
+        0,
+    )
+    items = []
+    errors = []
+
+    for index in range(max_len):
+        module_type = module_types[index].strip() if index < len(module_types) else ""
+        title = titles[index].strip() if index < len(titles) else ""
+        target = targets[index].strip() if index < len(targets) else ""
+        planned_sessions = sessions[index].strip() if index < len(sessions) else ""
+        planned_minutes = minutes[index].strip() if index < len(minutes) else ""
+        intensity = intensities[index].strip() if index < len(intensities) else ""
+
+        if not any([module_type, title, target, planned_sessions, planned_minutes, intensity]):
+            continue
+        row_label = f"第{index + 1}个计划项目"
+        if module_type not in TRAINING_PLAN_ITEM_MODULE_LABELS:
+            errors.append(f"{row_label}模块类型必须为体能训练、步法训练或技战术训练。")
+        if not title:
+            errors.append(f"{row_label}标题不能为空。")
+        if not target:
+            errors.append(f"{row_label}目标不能为空。")
+        try:
+            planned_sessions_int = int(planned_sessions)
+            if planned_sessions_int <= 0:
+                raise ValueError
+        except ValueError:
+            errors.append(f"{row_label}计划次数必须为正整数。")
+            planned_sessions_int = 0
+        try:
+            planned_minutes_int = int(planned_minutes)
+            if planned_minutes_int <= 0:
+                raise ValueError
+        except ValueError:
+            errors.append(f"{row_label}计划时长必须为正整数。")
+            planned_minutes_int = 0
+        if intensity not in {"低", "中", "高", "极高"}:
+            errors.append(f"{row_label}强度必须为低、中、高或极高。")
+
+        items.append(
+            {
+                "module_type": module_type,
+                "module_label": TRAINING_PLAN_ITEM_MODULE_LABELS.get(module_type, module_type),
+                "item_title": title,
+                "target_description": target,
+                "planned_sessions": planned_sessions_int,
+                "planned_minutes": planned_minutes_int,
+                "intensity": intensity,
+                "status": "pending",
+            }
+        )
+
+    if not items:
+        errors.append("至少添加一个训练计划项目。")
+    return items, errors
+
+
+def group_training_plan_items_by_plan():
+    grouped = {}
+    for item in TRAINING_PLAN_ITEMS:
+        grouped.setdefault(item["plan_id"], []).append(item)
+    return grouped
+
+
+def get_training_plan_items(plan_id):
+    return [item for item in TRAINING_PLAN_ITEMS if item["plan_id"] == plan_id]
+
+
+def validate_training_plan_status_choice(plan_status, plan_items):
+    errors = []
+    if plan_status in EXECUTABLE_PLAN_STATUSES and not plan_items:
+        errors.append("没有计划项目不能发布训练计划。")
+    if plan_status == "completed" and any(item.get("status") != "completed" for item in plan_items):
+        errors.append("所有计划项目完成后才能标记训练计划已完成。")
+    return errors
+
+
+def is_plan_released_for_execution(plan):
+    if not plan:
+        return False
+    return plan.get("status", "published") in EXECUTABLE_PLAN_STATUSES
+
+
+def get_training_plan_status_label(plan):
+    return TRAINING_PLAN_STATUS_LABELS.get(plan.get("status", "published"), "已发布")
+
+
+def build_execution_frame_items(module_type):
+    items = []
+    for item in TRAINING_PLAN_ITEMS:
+        if item["module_type"] != module_type:
+            continue
+        plan = next((plan for plan in TRAINING_PLANS if plan["id"] == item["plan_id"]), None)
+        if not is_plan_released_for_execution(plan):
+            continue
+        athlete = find_player(plan["athlete_id"]) if plan else None
+        enriched = dict(item)
+        enriched["title"] = item["item_title"]
+        enriched["plan_title"] = plan["content"] if plan else ""
+        enriched["athlete_name"] = athlete["name"] if athlete else "未知运动员"
+        items.append(enriched)
+    return items
 
 
 def validate_match_form(form):

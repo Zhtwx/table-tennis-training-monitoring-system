@@ -16,6 +16,31 @@
 
 <div class="card shadow-sm mb-4">
     <div class="card-header bg-white border-0 pt-4 px-4">
+        <h2 class="h5 mb-1">计划项目提示</h2>
+        <p class="text-secondary small mb-0">以下为训练计划中分配给技战术训练的项目；专项指标仍按本模块既有表单填写。</p>
+    </div>
+    <div class="card-body">
+        {% for item in module_plan_items %}
+            <div class="border rounded-3 p-3 mb-3">
+                <div class="d-flex flex-column flex-md-row justify-content-between gap-2">
+                    <div>
+                        <div class="fw-semibold">{{ item.item_title }}</div>
+                        <div class="small text-secondary">{{ item.athlete_name }} · {{ item.plan_title }}</div>
+                    </div>
+                    <div class="small text-secondary">
+                        {{ item.planned_sessions }} 次 · {{ item.planned_minutes }} 分钟 · {{ item.intensity }}
+                    </div>
+                </div>
+                <div class="small mt-2">{{ item.target_description }}</div>
+            </div>
+        {% else %}
+            <div class="text-secondary text-center py-3">暂无分配给技战术训练的计划项目。</div>
+        {% endfor %}
+    </div>
+</div>
+
+<div class="card shadow-sm mb-4">
+    <div class="card-header bg-white border-0 pt-4 px-4">
         <h2 class="h5 mb-1">{% if editing_record %}修改技战术训练记录{% else %}新增技战术训练记录{% endif %}</h2>
         <p class="text-secondary small mb-0">表单分为「执行记录」与「效果反馈」两大区块，量化与定性指标独立填写。</p>
     </div>

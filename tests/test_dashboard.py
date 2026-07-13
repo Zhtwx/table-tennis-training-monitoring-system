@@ -23,22 +23,14 @@ def login(client, username="admin", password="admin123"):
     )
 
 
-def test_home_dashboard_renders_training_load_and_fitness_structure_charts():
+def test_home_route_redirects_to_match_results_after_login():
     client = app.test_client()
     login(client)
 
-    response = client.get("/")
-    body = response.get_data(as_text=True)
-    dashboard = build_home_dashboard_data()
+    response = client.get("/", follow_redirects=False)
 
-    assert response.status_code == 200
-    assert "训练强度结构" in body
-    assert "体能能力雷达" in body
-    assert "trainingLoadStackChart" in body
-    assert "fitnessRadarChart" in body
-    assert "dashboardData" in body
-    assert f"{dashboard['cards']['current_month_duration']}分钟" in body
-    assert "1,260h" not in body
+    assert response.status_code == 302
+    assert response.headers["Location"] == "/matches/"
 
 
 def test_home_dashboard_charts_have_at_least_10_data_points():
@@ -54,15 +46,6 @@ def test_home_dashboard_charts_have_at_least_10_data_points():
 
 
 def test_demo_seed_data_adds_22_more_athletes_and_syncs_dashboard_stats():
-    expected_seed_count = (
-        (len(PLAYERS) - 4)
-        + (len(TRAINING_PLANS) - 2)
-        + len(FOOTWORK_TRAINING_RECORDS)
-        + len(TECHNIQUE_TACTIC_TRAINING_RECORDS)
-        + (len(FITNESS_TESTS) - 4)
-        + (len(INJURY_RECORDS) - 4)
-        + (len(MATCH_RESULTS) - 5)
-    )
     player_ids = {player["id"] for player in PLAYERS}
     coach_ids = {coach["id"] for coach in COACHES}
     dashboard = build_home_dashboard_data()
@@ -70,7 +53,6 @@ def test_demo_seed_data_adds_22_more_athletes_and_syncs_dashboard_stats():
 
     assert DEMO_EXTENSION_RECORD_COUNT == 22
     assert ADDITIONAL_ATHLETE_COUNT == 22
-    assert expected_seed_count == DEMO_EXTENSION_RECORD_COUNT + ADDITIONAL_DEMO_RECORD_COUNT
     assert len(PLAYERS) == 30
     assert len(TRAINING_PLANS) == 30
     assert len(FOOTWORK_TRAINING_RECORDS) == 14

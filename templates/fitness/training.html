@@ -1,0 +1,70 @@
+{% extends "base.html" %}
+
+{% block title %}体能训练 - 乒乓球运动员综合训练监控管理系统{% endblock %}
+
+{% block content %}
+<div class="d-flex flex-column flex-md-row align-items-md-center justify-content-between gap-3 mb-4">
+    <div>
+        <h1 class="page-title h3 mb-1">体能训练</h1>
+        <p class="text-secondary mb-0">承接训练计划中的体能类执行项目，历史体测记录保留独立访问。</p>
+    </div>
+    <a href="{{ url_for('fitness.tests') }}" class="btn btn-outline-secondary">历史体能测试</a>
+</div>
+
+<div class="row g-4">
+    <div class="col-12 col-xl-4">
+        <div class="card shadow-sm h-100">
+            <div class="card-header bg-white border-0 pt-4 px-4">
+                <h2 class="h5 mb-1">待执行</h2>
+            </div>
+            <div class="card-body">
+                {% for item in pending_items %}
+                    <div class="border rounded-3 p-3 mb-3">
+                        <div class="fw-semibold">{{ item.title }}</div>
+                        <div class="small text-secondary">{{ item.plan_title }}</div>
+                        <div class="small text-secondary">{{ item.athlete_name }}</div>
+                    </div>
+                {% else %}
+                    <div class="text-secondary text-center py-4">暂无待执行体能训练项目。</div>
+                {% endfor %}
+            </div>
+        </div>
+    </div>
+    <div class="col-12 col-xl-4">
+        <div class="card shadow-sm h-100">
+            <div class="card-header bg-white border-0 pt-4 px-4">
+                <h2 class="h5 mb-1">执行中</h2>
+            </div>
+            <div class="card-body">
+                {% for item in running_items %}
+                    <div class="border rounded-3 p-3 mb-3">
+                        <div class="fw-semibold">{{ item.title }}</div>
+                        <div class="small text-secondary">{{ item.plan_title }}</div>
+                        <div class="small text-secondary">{{ item.athlete_name }}</div>
+                    </div>
+                {% else %}
+                    <div class="text-secondary text-center py-4">暂无执行中的体能训练项目。</div>
+                {% endfor %}
+            </div>
+        </div>
+    </div>
+    <div class="col-12 col-xl-4">
+        <div class="card shadow-sm h-100">
+            <div class="card-header bg-white border-0 pt-4 px-4">
+                <h2 class="h5 mb-1">已完成</h2>
+            </div>
+            <div class="card-body">
+                {% for item in completed_items %}
+                    <div class="border rounded-3 p-3 mb-3">
+                        <div class="fw-semibold">{{ item.title }}</div>
+                        <div class="small text-secondary">{{ item.plan_title }}</div>
+                        <div class="small text-secondary">{{ item.athlete_name }}</div>
+                    </div>
+                {% else %}
+                    <div class="text-secondary text-center py-4">暂无已完成体能训练项目。</div>
+                {% endfor %}
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}

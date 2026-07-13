@@ -11,6 +11,16 @@
     <span class="badge text-bg-primary align-self-start align-self-md-center">管理员可见</span>
 </div>
 
+<div class="card shadow-sm mb-4">
+    <div class="card-body d-flex flex-column flex-md-row align-items-md-center justify-content-between gap-3">
+        <div>
+            <div class="fw-semibold">系统维护入口</div>
+            <div class="text-secondary small">数据字典、数据库检查和导入模板统一从这里进入。</div>
+        </div>
+        <a href="{{ url_for('settings.dictionary') }}" class="btn btn-outline-primary">打开系统维护</a>
+    </div>
+</div>
+
 <div class="row g-3 mb-4">
     <div class="col-6 col-xl-3">
         <div class="card shadow-sm stat-card h-100">

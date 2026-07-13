@@ -61,6 +61,24 @@
             background: rgba(255, 255, 255, .12);
         }
 
+        .sidebar-group {
+            color: rgba(255, 255, 255, .78);
+            font-size: .76rem;
+            letter-spacing: .08em;
+            text-transform: uppercase;
+        }
+
+        .sidebar-parent {
+            color: #e5eef9;
+            font-size: .86rem;
+            font-weight: 600;
+            margin-top: .35rem;
+        }
+
+        .sidebar-child {
+            padding-left: 1.1rem;
+        }
+
         .content-wrap {
             min-width: 0;
         }
@@ -136,20 +154,25 @@
 
             <div class="collapse navbar-collapse" id="topNavbar">
                 <ul class="navbar-nav ms-auto mb-2 mb-lg-0 align-items-lg-center">
-                    {% for item in nav_items[:4] %}
-                        <li class="nav-item">
-                            <a class="nav-link" href="{{ url_for(item.endpoint) }}">{{ item.label }}</a>
+                    {% for group in nav_groups %}
+                        <li class="nav-item dropdown">
+                            <a class="nav-link dropdown-toggle" href="#" role="button" data-bs-toggle="dropdown"
+                               aria-expanded="false">{{ group.label }}</a>
+                            <ul class="dropdown-menu dropdown-menu-end">
+                                {% for item in group["items"] %}
+                                    {% if item.children is defined %}
+                                        <li><h6 class="dropdown-header">{{ item.label }}</h6></li>
+                                        {% for child in item["children"] %}
+                                            <li><a class="dropdown-item" href="{{ url_for(child.endpoint) }}">{{ child.label }}</a></li>
+                                        {% endfor %}
+                                        {% if not loop.last %}<li><hr class="dropdown-divider"></li>{% endif %}
+                                    {% else %}
+                                        <li><a class="dropdown-item" href="{{ url_for(item.endpoint) }}">{{ item.label }}</a></li>
+                                    {% endif %}
+                                {% endfor %}
+                            </ul>
                         </li>
                     {% endfor %}
-                    <li class="nav-item dropdown">
-                        <a class="nav-link dropdown-toggle" href="#" role="button" data-bs-toggle="dropdown"
-                           aria-expanded="false">业务中心</a>
-                        <ul class="dropdown-menu dropdown-menu-end">
-                            {% for item in nav_items[4:] %}
-                                <li><a class="dropdown-item" href="{{ url_for(item.endpoint) }}">{{ item.label }}</a></li>
-                            {% endfor %}
-                        </ul>
-                    </li>
                     <li class="nav-item dropdown ms-lg-2">
                         <a class="nav-link dropdown-toggle" href="#" role="button" data-bs-toggle="dropdown"
                            aria-expanded="false">{{ current_user.name }}</a>
@@ -167,12 +190,29 @@
     <div class="d-lg-flex layout-shell">
         <aside class="sidebar p-3 p-lg-4">
             <div class="mb-3 small text-uppercase text-white-50">功能导航</div>
-            <nav class="nav flex-column gap-1">
-                {% for item in nav_items %}
-                    <a class="nav-link {% if request.endpoint == item.endpoint %}active{% endif %}"
-                       href="{{ url_for(item.endpoint) }}">{{ item.label }}</a>
+            <div class="vstack gap-3">
+                {% for group in nav_groups %}
+                    <section>
+                        <div class="sidebar-group mb-2">{{ group.label }}</div>
+                        <nav class="nav flex-column gap-1">
+                            {% for item in group["items"] %}
+                                {% if item.children is defined %}
+                                    <div class="sidebar-parent">{{ item.label }}</div>
+                                    <div class="nav flex-column gap-1 sidebar-child">
+                                        {% for child in item["children"] %}
+                                            <a class="nav-link {% if request.endpoint == child.endpoint %}active{% endif %}"
+                                               href="{{ url_for(child.endpoint) }}">{{ child.label }}</a>
+                                        {% endfor %}
+                                    </div>
+                                {% else %}
+                                    <a class="nav-link {% if request.endpoint == item.endpoint %}active{% endif %}"
+                                       href="{{ url_for(item.endpoint) }}">{{ item.label }}</a>
+                                {% endif %}
+                            {% endfor %}
+                        </nav>
+                    </section>
                 {% endfor %}
-            </nav>
+            </div>
         </aside>
         <div class="sidebar-resizer d-none d-lg-block" id="sidebarResizer" aria-hidden="true"></div>
 

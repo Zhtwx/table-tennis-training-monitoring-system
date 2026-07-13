@@ -23,7 +23,7 @@ def test_login_rejects_external_next_redirect():
     )
 
     assert response.status_code == 302
-    assert response.headers["Location"] == "/"
+    assert response.headers["Location"] == "/matches/"
 
 
 def test_health_check_is_public():
@@ -54,7 +54,7 @@ def test_legacy_training_record_url_redirects_to_canonical_records_url():
     response = client.get("/training/training_record", follow_redirects=False)
 
     assert response.status_code == 301
-    assert response.headers["Location"] == "/training/records"
+    assert response.headers["Location"] == "/training/technique-tactic"
 
 
 def test_coach_cannot_open_coach_write_pages():
@@ -95,7 +95,7 @@ def test_coach_can_only_delete_owned_training_plan():
         assert app_module.AUDIT_LOGS[-1]["target_id"] == 2
         assert app_module.AUDIT_LOGS[-1]["username"] == "coach"
     finally:
-        app_module.TRAINING_PLANS = original_plans
+        app_module.TRAINING_PLANS[:] = original_plans
         if hasattr(app_module, "AUDIT_LOGS"):
             app_module.AUDIT_LOGS[:] = original_audit_logs
 
@@ -111,4 +111,4 @@ def test_missing_csrf_token_rejects_authenticated_write_request():
         assert response.status_code == 400
         assert any(plan["id"] == 2 for plan in app_module.TRAINING_PLANS)
     finally:
-        app_module.TRAINING_PLANS = original_plans
+        app_module.TRAINING_PLANS[:] = original_plans

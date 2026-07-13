@@ -18,6 +18,51 @@
     </div>
 </div>
 
+{% if source_match %}
+<div class="card shadow-sm mb-4 border-start border-4 border-primary">
+    <div class="card-body">
+        <div class="fw-semibold mb-2">来源比赛</div>
+        {% if source_notice %}
+        <div class="alert alert-warning py-2 mb-3">{{ source_notice }}</div>
+        {% endif %}
+        <div class="row g-3">
+            <div class="col-12 col-lg-4">
+                <div class="text-secondary small">比赛</div>
+                <div>{{ source_match.match_name }}</div>
+            </div>
+            <div class="col-6 col-lg-2">
+                <div class="text-secondary small">日期</div>
+                <div>{{ source_match.match_date }}</div>
+            </div>
+            <div class="col-6 col-lg-2">
+                <div class="text-secondary small">结果</div>
+                <div>{{ source_match.result }} {{ source_match.score }}</div>
+            </div>
+            <div class="col-12 col-lg-4">
+                <div class="text-secondary small">复盘摘要</div>
+                <div>{{ source_match.key_points or source_match.improvement or '待教练补充' }}</div>
+            </div>
+        </div>
+        {% if source_analysis %}
+        <div class="border rounded-3 p-3 bg-light mt-3">
+            <div class="fw-semibold mb-2">已确认技战术分析版本：V{{ source_analysis.version_no }}</div>
+            <div class="row g-3">
+                <div class="col-12 col-lg-3">
+                    <div class="text-secondary small">标准状态</div>
+                    <div>标准待核验</div>
+                </div>
+                <div class="col-12 col-lg-9">
+                    <div class="text-secondary small">教练结论</div>
+                    <div>{{ source_analysis.coach_summary or '教练未填写结论' }}</div>
+                </div>
+            </div>
+            <div class="small text-secondary mt-2">该分析仅作为人工制定训练计划的来源依据；系统不自动生成训练处方。</div>
+        </div>
+        {% endif %}
+    </div>
+</div>
+{% endif %}
+
 <!-- 查询表单 -->
 <div class="card shadow-sm mb-4">
     <div class="card-header bg-white border-0 pt-4 px-4">
@@ -71,6 +116,9 @@
                         <th>教练</th>
                         <th>计划时间</th>
                         <th>内容</th>
+                        <th>状态</th>
+                        <th>来源</th>
+                        <th>计划项目</th>
                         <th>强度</th>
                         <th>时长(分)</th>
                         <th>地点</th>
@@ -85,6 +133,29 @@
                         <td>{{ plan.coach_name }}</td>
                         <td>{{ plan.plan_datetime }}</td>
                         <td>{{ plan.content }}</td>
+                        <td>
+                            {% set plan_status = plan.get('status', 'published') %}
+                            <span class="badge text-bg-secondary">{{ plan_status_labels.get(plan_status, '已发布') }}</span>
+                        </td>
+                        <td>
+                            {% if plan.get('source_summary') %}
+                                <span class="badge text-bg-info">来源比赛</span>
+                                <div class="small text-secondary mt-1">{{ plan.get('source_summary') }}</div>
+                            {% else %}
+                                <span class="text-secondary">-</span>
+                            {% endif %}
+                        </td>
+                        <td>
+                            {% set plan_items = plan_items_by_plan_id.get(plan.id, []) %}
+                            {% for item in plan_items %}
+                                <div class="mb-2">
+                                    <span class="badge text-bg-light border text-dark">{{ item.module_label }}</span>
+                                    <span class="small">{{ item.item_title }}</span>
+                                </div>
+                            {% else %}
+                                <span class="text-secondary small">未拆分项目</span>
+                            {% endfor %}
+                        </td>
                         <td>
                             <span class="badge 
                                 {% if plan.intensity == '高' %}text-bg-danger
@@ -105,7 +176,7 @@
                     </tr>
                     {% else %}
                     <tr>
-                        <td colspan="9" class="text-center text-secondary py-5">暂无训练计划，请新增</td>
+                        <td colspan="12" class="text-center text-secondary py-5">暂无训练计划，请新增</td>
                     </tr>
                     {% endfor %}
                 </tbody>
@@ -123,6 +194,12 @@
                 <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="关闭"></button>
             </div>
             <form method="post" action="{{ url_for('training.plans') }}">
+                <input type="hidden" name="source_type" value="{{ source_type }}">
+                <input type="hidden" name="source_match_id" value="{{ source_match_id }}">
+                {% if source_analysis_id %}
+                <input type="hidden" name="source_analysis_id" value="{{ source_analysis_id }}">
+                {% endif %}
+                <input type="hidden" name="source_summary" value="{{ source_summary }}">
                 <div class="modal-body">
                     <div class="row g-3">
                         <div class="col-md-6">
@@ -130,7 +207,7 @@
                             <select class="form-select" id="athlete_id" name="athlete_id" required>
                                 <option value="">请选择</option>
                                 {% for athlete in athletes %}
-                                <option value="{{ athlete.id }}">{{ athlete.name }}</option>
+                                <option value="{{ athlete.id }}" {% if default_athlete_id and default_athlete_id|int == athlete.id %}selected{% endif %}>{{ athlete.name }}</option>
                                 {% endfor %}
                             </select>
                         </div>
@@ -139,7 +216,7 @@
                             <select class="form-select" id="coach_id" name="coach_id">
                                 <option value="">请选择</option>
                                 {% for coach in coaches %}
-                                <option value="{{ coach.id }}">{{ coach.name }}</option>
+                                <option value="{{ coach.id }}" {% if default_coach_id and default_coach_id|int == coach.id %}selected{% endif %}>{{ coach.name }}</option>
                                 {% endfor %}
                             </select>
                             <small class="text-muted">可选</small>
@@ -158,6 +235,15 @@
                             </select>
                         </div>
                         <div class="col-md-6">
+                            <label for="plan_status" class="form-label">计划状态</label>
+                            <select class="form-select" id="plan_status" name="plan_status">
+                                {% for option in plan_status_options %}
+                                <option value="{{ option.value }}" {% if option.value == 'draft' %}selected{% endif %}>{{ option.label }}</option>
+                                {% endfor %}
+                            </select>
+                            <small class="text-muted">草稿计划不会下发到体能、步法、技战术执行模块。</small>
+                        </div>
+                        <div class="col-md-6">
                             <label for="duration" class="form-label">时长（分钟）</label>
                             <input type="number" class="form-control" id="duration" name="duration" value="60" min="1">
                         </div>
@@ -168,6 +254,51 @@
                         <div class="col-12">
                             <label for="content" class="form-label">训练内容</label>
                             <textarea class="form-control" id="content" name="content" rows="3" required></textarea>
+                        </div>
+                        <div class="col-12">
+                            <div class="border rounded-3 p-3 bg-light">
+                                <div class="fw-semibold mb-3">计划项目</div>
+                                {% for row_index in range(3) %}
+                                <div class="row g-2 align-items-end mb-3">
+                                    <div class="col-12 col-lg-2">
+                                        <label class="form-label">模块</label>
+                                        <select class="form-select" name="item_module_type">
+                                            <option value="">请选择</option>
+                                            {% for option in item_module_options %}
+                                            <option value="{{ option.value }}" {% if row_index == loop.index0 %}selected{% endif %}>{{ option.label }}</option>
+                                            {% endfor %}
+                                        </select>
+                                    </div>
+                                    <div class="col-12 col-lg-3">
+                                        <label class="form-label">项目标题</label>
+                                        <input type="text" class="form-control" name="item_title" placeholder="由教练填写">
+                                    </div>
+                                    <div class="col-12 col-lg-3">
+                                        <label class="form-label">目标</label>
+                                        <input type="text" class="form-control" name="item_target_description" placeholder="人工确认训练目标">
+                                    </div>
+                                    <div class="col-4 col-lg-1">
+                                        <label class="form-label">次数</label>
+                                        <input type="number" class="form-control" name="item_planned_sessions" min="1" value="{% if row_index == 0 %}1{% endif %}">
+                                    </div>
+                                    <div class="col-4 col-lg-1">
+                                        <label class="form-label">分钟</label>
+                                        <input type="number" class="form-control" name="item_planned_minutes" min="1" value="{% if row_index == 0 %}30{% endif %}">
+                                    </div>
+                                    <div class="col-4 col-lg-2">
+                                        <label class="form-label">强度</label>
+                                        <select class="form-select" name="item_intensity">
+                                            <option value="">请选择</option>
+                                            <option value="低">低</option>
+                                            <option value="中" {% if row_index == 0 %}selected{% endif %}>中</option>
+                                            <option value="高">高</option>
+                                            <option value="极高">极高</option>
+                                        </select>
+                                    </div>
+                                </div>
+                                {% endfor %}
+                                <div class="small text-secondary">每个计划至少填写一个可执行项目；具体体能、步法、技战术细节由对应模块继续录入。</div>
+                            </div>
                         </div>
                     </div>
                 </div>

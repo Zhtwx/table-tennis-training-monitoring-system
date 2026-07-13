@@ -49,6 +49,14 @@
                     <label for="location" class="form-label">地点</label>
                     <input type="text" class="form-control" id="location" name="location" value="{{ plan.location }}">
                 </div>
+                <div class="col-md-6">
+                    <label for="plan_status" class="form-label">计划状态</label>
+                    <select class="form-select" id="plan_status" name="plan_status">
+                        {% for option in plan_status_options %}
+                        <option value="{{ option.value }}" {% if option.value == plan.get('status', 'published') %}selected{% endif %}>{{ option.label }}</option>
+                        {% endfor %}
+                    </select>
+                </div>
                 <div class="col-12">
                     <label for="content" class="form-label">训练内容</label>
                     <textarea class="form-control" id="content" name="content" rows="3" required>{{ plan.content }}</textarea>
