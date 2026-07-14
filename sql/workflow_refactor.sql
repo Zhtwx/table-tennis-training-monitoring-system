@@ -1,7 +1,9 @@
 -- Workflow refactor schema contract for MySQL 5.5.
 -- This script only adds workflow tables. It does not delete or rewrite legacy tables.
 -- Keep this file limited to MySQL 5.5 compatible DDL.
+-- Run after sql/pingpang_db.sql.
 
+USE pingpang_db;
 SET NAMES utf8mb4;
 
 CREATE TABLE IF NOT EXISTS tactical_standard_version (
@@ -41,6 +43,11 @@ CREATE TABLE IF NOT EXISTS match_tactical_analysis (
   UNIQUE KEY uk_analysis_version (match_id, version_no),
   KEY idx_analysis_match_status (match_id, status),
   KEY idx_analysis_standard (standard_version_id),
+  CONSTRAINT fk_analysis_match
+    FOREIGN KEY (match_id)
+    REFERENCES match_record (id)
+    ON UPDATE CASCADE
+    ON DELETE CASCADE,
   CONSTRAINT fk_analysis_standard_version
     FOREIGN KEY (standard_version_id)
     REFERENCES tactical_standard_version (id)
@@ -68,7 +75,7 @@ CREATE TABLE IF NOT EXISTS match_phase_stat (
     FOREIGN KEY (analysis_id)
     REFERENCES match_tactical_analysis (id)
     ON UPDATE CASCADE
-    ON DELETE RESTRICT
+    ON DELETE CASCADE
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
 
 CREATE TABLE IF NOT EXISTS training_plan_source (
@@ -84,9 +91,19 @@ CREATE TABLE IF NOT EXISTS training_plan_source (
   KEY idx_plan_source_plan (plan_id),
   KEY idx_plan_source_analysis (match_analysis_id),
   KEY idx_plan_source_injury (injury_record_id),
+  CONSTRAINT fk_plan_source_plan
+    FOREIGN KEY (plan_id)
+    REFERENCES training_plan (id)
+    ON UPDATE CASCADE
+    ON DELETE CASCADE,
   CONSTRAINT fk_plan_source_analysis
     FOREIGN KEY (match_analysis_id)
     REFERENCES match_tactical_analysis (id)
+    ON UPDATE CASCADE
+    ON DELETE RESTRICT,
+  CONSTRAINT fk_plan_source_injury
+    FOREIGN KEY (injury_record_id)
+    REFERENCES injury_record (id)
     ON UPDATE CASCADE
     ON DELETE RESTRICT
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
@@ -107,10 +124,17 @@ CREATE TABLE IF NOT EXISTS training_plan_item (
   updated_at DATETIME NOT NULL,
   PRIMARY KEY (id),
   KEY idx_plan_item_plan (plan_id),
-  KEY idx_plan_item_module_status (module_type, status)
+  KEY idx_plan_item_module_status (module_type, status),
+  CONSTRAINT fk_plan_item_plan
+    FOREIGN KEY (plan_id)
+    REFERENCES training_plan (id)
+    ON UPDATE CASCADE
+    ON DELETE CASCADE
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
 
-CREATE OR REPLACE VIEW v_training_execution_feedback AS
+DROP VIEW IF EXISTS v_training_execution_feedback;
+
+CREATE VIEW v_training_execution_feedback AS
 SELECT
   NULL AS execution_id,
   'fitness' AS module_type,
@@ -122,4 +146,5 @@ SELECT
   NULL AS execution_status,
   NULL AS feedback_summary,
   NULL AS updated_at
+FROM DUAL
 WHERE 1 = 0;

@@ -27,6 +27,7 @@ from auth_utils import (
     role_required,
 )
 from repositories import training_repository as training_repo
+from repositories.db_helpers import fetch_all, is_database_setup_error
 from security import AUDIT_LOGS, csrf_token, record_audit_log, validate_csrf_token
 
 NAV_GROUPS = [
@@ -2454,6 +2455,8 @@ def create_app():
     @role_required("admin", "coach")
     def fitness_training():
         items = build_execution_frame_items("fitness")
+        if not items:
+            items = build_sql_fitness_training_frame_items() or build_legacy_fitness_training_frame_items()
         return render_template(
             "fitness/training.html",
             pending_items=[item for item in items if item["status"] == "pending"],
@@ -3259,6 +3262,149 @@ def build_execution_frame_items(module_type):
     return items
 
 
+def normalize_training_execution_status(status):
+    mapping = {
+        "待执行": "pending",
+        "草稿": "pending",
+        "进行中": "running",
+        "执行中": "running",
+        "已完成": "completed",
+        "完成": "completed",
+    }
+    return mapping.get(status, "pending")
+
+
+def build_legacy_fitness_training_frame_items():
+    items = []
+    records_by_id = {record["id"]: enrich_fitness_record(record) for record in FITNESS_TESTS}
+    for sync_log in TRAINING_SYNC_LOGS:
+        record = records_by_id.get(sync_log["fitness_test_id"])
+        if not record:
+            continue
+        items.append(
+            {
+                "id": f"fitness-sync-{sync_log['id']}",
+                "status": normalize_training_execution_status(sync_log["status"]),
+                "title": sync_log["plan_name"],
+                "plan_title": f"来自历史体能测试同步 · {record['test_date']} · 综合评分 {record['fitness_score']}",
+                "athlete_name": record["player_name"],
+                "intensity": sync_log["intensity"],
+                "planned_minutes": int(float(sync_log["hours"]) * 60) if sync_log.get("hours") else 0,
+                "target_description": record["notes"],
+                "source_label": "来自历史体能测试同步",
+            }
+        )
+    latest_record = max(records_by_id.values(), key=lambda item: (item["test_date"], item["id"]), default=None)
+    if latest_record:
+        items.append(
+            {
+                "id": "fitness-sync-pending-review",
+                "status": "pending",
+                "title": "近期体能复测待安排",
+                "plan_title": f"来自历史体能测试同步 · {latest_record['test_date']} · 综合评分 {latest_record['fitness_score']}",
+                "athlete_name": latest_record["player_name"],
+                "intensity": "低",
+                "planned_minutes": 45,
+                "target_description": "根据最近一次体能测试结果，由教练人工确认是否安排复测或过渡训练。",
+                "source_label": "来自历史体能测试同步",
+            }
+        )
+    return sorted(items, key=lambda item: item["id"])
+
+
+def build_sql_fitness_training_frame_items():
+    if os.getenv("TRAINING_STORAGE", "").strip().lower() == "memory":
+        return []
+    try:
+        try:
+            items = build_sql_redesigned_fitness_training_items()
+            if items:
+                return items
+        except Exception as exc:
+            if not is_database_setup_error(exc):
+                raise
+        return build_sql_legacy_fitness_report_items()
+    except Exception as exc:
+        if is_database_setup_error(exc):
+            return []
+        raise
+
+
+def build_sql_redesigned_fitness_training_items():
+    rows = fetch_all(
+        """
+        SELECT
+            ftr.id,
+            a.name AS athlete_name,
+            ftr.test_date,
+            ftr.plan_name,
+            ftr.training_hours,
+            ftr.training_intensity,
+            ftr.plan_status,
+            ftr.overall_score,
+            ftr.notes
+        FROM fitness_training_record ftr
+        JOIN athlete a ON a.id = ftr.athlete_id
+        ORDER BY ftr.test_date DESC, ftr.id DESC
+        LIMIT 12
+        """
+    )
+    return [
+        {
+            "id": f"sql-fitness-training-{row['id']}",
+            "status": normalize_training_execution_status(row.get("plan_status", "")),
+            "title": row["plan_name"],
+            "plan_title": f"来自数据库体能训练记录 · {row['test_date']} · 综合评分 {row['overall_score']}",
+            "athlete_name": row["athlete_name"],
+            "intensity": row.get("training_intensity", ""),
+            "planned_minutes": int(float(row.get("training_hours") or 0) * 60),
+            "target_description": row.get("notes") or "数据库体能训练记录",
+            "source_label": "来自数据库体能训练记录",
+        }
+        for row in rows
+    ]
+
+
+def build_sql_legacy_fitness_report_items():
+    rows = fetch_all(
+        """
+        SELECT
+            fr.id,
+            a.name AS athlete_name,
+            fr.test_date,
+            COALESCE(tp.plan_name, CONCAT('历史体测同步训练-', a.name)) AS plan_name,
+            COALESCE(tp.hours, 1.0) AS training_hours,
+            COALESCE(tp.intensity, '中') AS training_intensity,
+            COALESCE(tp.status, '待执行') AS plan_status,
+            fr.overall_score,
+            fr.notes
+        FROM fitness_report fr
+        JOIN athlete a ON a.id = fr.athlete_id
+        LEFT JOIN training_plan tp
+          ON tp.athlete_id = fr.athlete_id
+         AND tp.coach_id = fr.tester_id
+         AND tp.start_date <= fr.test_date
+         AND tp.end_date >= fr.test_date
+        ORDER BY fr.test_date DESC, fr.id DESC
+        LIMIT 12
+        """
+    )
+    return [
+        {
+            "id": f"sql-fitness-report-{row['id']}",
+            "status": normalize_training_execution_status(row.get("plan_status", "")),
+            "title": row["plan_name"],
+            "plan_title": f"来自数据库历史体能测试 · {row['test_date']} · 综合评分 {row['overall_score']}",
+            "athlete_name": row["athlete_name"],
+            "intensity": row.get("training_intensity", ""),
+            "planned_minutes": int(float(row.get("training_hours") or 0) * 60),
+            "target_description": row.get("notes") or "由历史体能测试记录关联展示",
+            "source_label": "来自数据库历史体能测试",
+        }
+        for row in rows
+    ]
+
+
 def validate_match_form(form):
     record_id = form.get("record_id", "").strip()
     athlete_id = parse_int_field(form.get("athlete_id", "").strip(), "运动员")
@@ -3612,6 +3758,20 @@ def filter_technique_tactic_records(args):
 
 
 def build_overall_stats():
+    def latest_by_athlete(records, date_key):
+        latest = {}
+        for record in records:
+            athlete_id = record.get("athlete_id")
+            if athlete_id is None:
+                continue
+            if athlete_id not in latest or str(record.get(date_key, "")) > str(latest[athlete_id].get(date_key, "")):
+                latest[athlete_id] = record
+        return latest
+
+    def score_to_percent(value):
+        score = float(value or 0)
+        return round(score * 10, 1) if score <= 10 else round(score, 1)
+
     monthly_training = {}
     for plan in TRAINING_PLANS:
         month_key = plan["plan_datetime"][:7]
@@ -3641,14 +3801,42 @@ def build_overall_stats():
             fitness_rank.append({"name": player["name"], "score": test["overall_score"]})
     fitness_rank.sort(key=lambda item: item["score"], reverse=True)
 
+    fitness_detail = {
+        "names": [],
+        "upper_strength": [],
+        "lower_strength": [],
+        "flexibility": [],
+        "endurance": [],
+        "speed": [],
+    }
+    latest_fitness_metric_scores = {}
+    for athlete_id, test in latest_fitness.items():
+        player = find_player(athlete_id)
+        if not player:
+            continue
+        metric_scores = build_fitness_metric_scores(test)
+        latest_fitness_metric_scores[athlete_id] = metric_scores
+        fitness_detail["names"].append(player["name"])
+        fitness_detail["upper_strength"].append(metric_scores["abdominal_endurance"])
+        fitness_detail["lower_strength"].append(metric_scores["standing_long_jump"])
+        fitness_detail["flexibility"].append(metric_scores["lateral_slide"])
+        fitness_detail["endurance"].append(metric_scores["back_endurance"])
+        fitness_detail["speed"].append(metric_scores["sprint_30m"])
+
     intensity_counts = {}
     for plan in TRAINING_PLANS:
         intensity = plan["intensity"]
         intensity_counts[intensity] = intensity_counts.get(intensity, 0) + 1
     intensity_pie = [{"name": name, "value": value} for name, value in sorted(intensity_counts.items())]
 
+    footwork_records = list(training_repo.list_footwork_records())
+    technique_records = list(training_repo.list_technique_tactic_records())
+    latest_footwork = latest_by_athlete(footwork_records, "training_date")
+    latest_technique = latest_by_athlete(technique_records, "training_date")
+    max_footwork_duration = max((float(record.get("duration_minutes") or 0) for record in footwork_records), default=0)
+
     monthly_skill = {}
-    for record in training_repo.list_technique_tactic_records():
+    for record in technique_records:
         month_key = record["training_date"][:7]
         score = calculate_technique_tactic_score(record)
         stats = monthly_skill.setdefault(month_key, {"total": 0.0, "count": 0})
@@ -3660,6 +3848,40 @@ def build_overall_stats():
         for key in skill_month_labels
     ]
 
+    footwork_monthly = {}
+    for record in footwork_records:
+        month_key = record["training_date"][:7]
+        stats = footwork_monthly.setdefault(month_key, {"total_duration": 0.0, "count": 0})
+        stats["total_duration"] += float(record.get("duration_minutes") or 0)
+        stats["count"] += 1
+    footwork_month_labels = sorted(footwork_monthly)
+    footwork_month_scores = [
+        round(footwork_monthly[key]["total_duration"] / footwork_monthly[key]["count"], 1)
+        for key in footwork_month_labels
+    ]
+
+    radar = {"names": [], "data": []}
+    for athlete_id, test in latest_fitness.items():
+        player = find_player(athlete_id)
+        if not player:
+            continue
+        metric_scores = latest_fitness_metric_scores.get(athlete_id) or build_fitness_metric_scores(test)
+        technique_score = calculate_technique_tactic_score(latest_technique[athlete_id]) if athlete_id in latest_technique else 0
+        footwork_record = latest_footwork.get(athlete_id)
+        footwork_score = 0
+        if footwork_record and max_footwork_duration > 0:
+            footwork_score = round(float(footwork_record.get("duration_minutes") or 0) / max_footwork_duration * 100, 1)
+        radar["names"].append(player["name"])
+        radar["data"].append(
+            [
+                score_to_percent(test.get("overall_score")),
+                round(float(technique_score or 0), 1),
+                footwork_score,
+                score_to_percent(metric_scores["sprint_30m"]),
+                score_to_percent(metric_scores["back_endurance"]),
+            ]
+        )
+
     current_month = datetime.now().strftime("%Y-%m")
     active_injury_statuses = {"治疗中", "康复中"}
     active_injuries = sum(
@@ -3668,6 +3890,12 @@ def build_overall_stats():
         if not record.get("is_deleted") and record["recovery_status"] in active_injury_statuses
     )
     fitness_scores = [item["score"] for item in fitness_rank]
+    technique_scores = [calculate_technique_tactic_score(record) for record in latest_technique.values()]
+    footwork_scores = [
+        float(record.get("duration_minutes") or 0) / max_footwork_duration * 100
+        for record in latest_footwork.values()
+        if max_footwork_duration > 0
+    ]
 
     return {
         "cards": {
@@ -3675,6 +3903,8 @@ def build_overall_stats():
             "current_month_duration": monthly_training.get(current_month, {"duration": 0})["duration"],
             "active_injuries": active_injuries,
             "avg_fitness": round(sum(fitness_scores) / len(fitness_scores), 1) if fitness_scores else 0,
+            "avg_tech": round(sum(technique_scores) / len(technique_scores), 1) if technique_scores else 0,
+            "avg_footwork": round(sum(footwork_scores) / len(footwork_scores), 1) if footwork_scores else 0,
         },
         "month_labels": month_labels,
         "monthly_duration": monthly_duration,
@@ -3683,6 +3913,10 @@ def build_overall_stats():
         "fitness_player_names": [item["name"] for item in fitness_rank],
         "fitness_player_scores": fitness_scores,
         "intensity_pie": intensity_pie,
+        "fitness_detail": fitness_detail,
+        "radar": radar,
+        "footwork_month_labels": footwork_month_labels,
+        "footwork_month_scores": footwork_month_scores,
         "skill_month_labels": skill_month_labels,
         "skill_month_scores": skill_month_scores,
     }

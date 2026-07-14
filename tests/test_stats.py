@@ -28,6 +28,106 @@ def test_stats_dashboard_renders_charts_and_cards():
     assert "月度训练时长趋势" in body
     assert "伤病部位分布" in body
     assert "trainTrendChart" in body
+    for chart_id in (
+        "fitnessDetailChart",
+        "radarChart",
+        "footworkTrendChart",
+        "skillTrendChart",
+        "intensityPieChart",
+    ):
+        assert chart_id in body
+
+
+def test_build_overall_stats_provides_dashboard_schema():
+    stats = app_module.build_overall_stats()
+
+    for card_key in ("total_athletes", "current_month_duration", "active_injuries", "avg_fitness", "avg_tech", "avg_footwork"):
+        assert card_key in stats["cards"]
+
+    assert set(stats["fitness_detail"]) == {
+        "names",
+        "upper_strength",
+        "lower_strength",
+        "flexibility",
+        "endurance",
+        "speed",
+    }
+    assert set(stats["radar"]) == {"names", "data"}
+    assert "footwork_month_labels" in stats
+    assert "footwork_month_scores" in stats
+
+
+def test_build_overall_stats_uses_training_repository_and_current_score_logic(monkeypatch):
+    player = {"id": 101, "name": "测试运动员", "gender": "男"}
+    fitness_record = app_module.build_fitness_test_record(
+        501,
+        player["id"],
+        "2026-07-01 09:00",
+        2,
+        {
+            "sprint_30m": 4.5,
+            "abdominal_endurance": 100,
+            "back_endurance": 100,
+            "lateral_slide": 7.0,
+            "a_footwork": 11.0,
+            "double_under": 100,
+            "seated_rotation_throw": 500,
+            "standing_long_jump": 240,
+        },
+        "",
+        "admin",
+    )
+    repository_footwork_records = [
+        {
+            "id": 1,
+            "athlete_id": player["id"],
+            "training_date": "2026-07-02",
+            "footwork_dict_id": 1,
+            "duration_minutes": 40,
+            "set_count": 4,
+            "note": "",
+        }
+    ]
+    repository_technique_records = [
+        {
+            "id": 2,
+            "athlete_id": player["id"],
+            "training_date": "2026-07-03",
+            "technique_dict_id": 1,
+            "technique_category_id": 1,
+            "multi_ball_count": 120,
+            "serve_frequency": "高",
+            "plan_execution_rate": 70,
+            "on_table_rate": 80,
+            "hit_score": 12,
+            "landing_items": [],
+            "qualitative_comment": "",
+        }
+    ]
+
+    monkeypatch.setattr(app_module, "PLAYERS", [player])
+    monkeypatch.setattr(app_module, "FITNESS_TESTS", [fitness_record])
+    monkeypatch.setattr(app_module, "TRAINING_PLANS", [])
+    monkeypatch.setattr(app_module, "INJURY_RECORDS", [])
+    monkeypatch.setattr(
+        app_module.training_repo,
+        "list_footwork_records",
+        lambda filters=None: repository_footwork_records,
+    )
+    monkeypatch.setattr(
+        app_module.training_repo,
+        "list_technique_tactic_records",
+        lambda filters=None: repository_technique_records,
+    )
+
+    stats = app_module.build_overall_stats()
+
+    assert stats["cards"]["avg_tech"] == 80
+    assert stats["cards"]["avg_footwork"] == 100
+    assert stats["skill_month_labels"] == ["2026-07"]
+    assert stats["skill_month_scores"] == [80]
+    assert stats["footwork_month_labels"] == ["2026-07"]
+    assert stats["footwork_month_scores"] == [40]
 
 
 def test_stats_export_all_returns_xlsx_workbook():

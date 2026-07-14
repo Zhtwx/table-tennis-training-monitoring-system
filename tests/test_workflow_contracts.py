@@ -36,6 +36,7 @@ def test_workflow_refactor_sql_stays_mysql55_compatible():
         " over (",
         " check ",
         "->",
+        "create or replace view",
     ]
     for fragment in forbidden_fragments:
         assert fragment not in sql

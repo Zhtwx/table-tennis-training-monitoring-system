@@ -252,6 +252,11 @@ DELIMITER ;
 -- 只读账号: 用于统计大屏、答辩演示或数据审计，不能写入业务数据。
 GRANT SELECT ON pingpang_db.* TO 'readonly_app'@'localhost' IDENTIFIED BY 'Readonly2026#';
 
+-- Docker Desktop 端口映射下，Windows 主机连接会以容器网关地址出现。
+-- 为应用账号保留与基础脚本相同的最小 CRUD 权限，不授予建表或授权能力。
+GRANT SELECT, INSERT, UPDATE, DELETE ON pingpang_db.*
+    TO 'coach_app'@'%' IDENTIFIED BY 'Coach2026#';
+
 -- 建议业务系统优先使用低权限账号，避免 Flask 应用直接使用 root。
 FLUSH PRIVILEGES;
 

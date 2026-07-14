@@ -508,13 +508,19 @@ def _seed_database_if_empty():
     if footwork_count or technique_count:
         return
 
+    available_athlete_ids = {int(row["id"]) for row in fetch_all("SELECT id FROM athlete")}
+
     for spec in _DEMO_FOOTWORK_SPECS:
-        create_footwork_record(materialize_footwork_spec(spec), operator=spec.get("created_by"))
+        if spec["athlete_id"] in available_athlete_ids:
+            create_footwork_record(materialize_footwork_spec(spec), operator=spec.get("created_by"))
     for spec in _DEMO_TECHNIQUE_SPECS:
-        create_technique_tactic_record(materialize_technique_spec(spec), operator=spec.get("created_by"))
+        if spec["athlete_id"] in available_athlete_ids:
+            create_technique_tactic_record(materialize_technique_spec(spec), operator=spec.get("created_by"))
 
     for index in range(22):
         athlete_id = index + 9
+        if athlete_id not in available_athlete_ids:
+            continue
         training_date = f"{_ADDITIONAL_TREND_MONTHS[index % len(_ADDITIONAL_TREND_MONTHS)]}-{(index % 20) + 1:02d}"
         if index % 2 == 0:
             create_footwork_record(

@@ -20,9 +20,16 @@
             <div class="card-body">
                 {% for item in pending_items %}
                     <div class="border rounded-3 p-3 mb-3">
+                        {% if item.source_label %}
+                        <div class="badge text-bg-info mb-2">{{ item.source_label }}</div>
+                        {% endif %}
                         <div class="fw-semibold">{{ item.title }}</div>
                         <div class="small text-secondary">{{ item.plan_title }}</div>
                         <div class="small text-secondary">{{ item.athlete_name }}</div>
+                        <div class="small mt-2">强度：{{ item.intensity or '-' }} / 计划时长：{{ item.planned_minutes or 0 }} 分钟</div>
+                        {% if item.target_description %}
+                        <div class="small text-secondary mt-2">{{ item.target_description }}</div>
+                        {% endif %}
                     </div>
                 {% else %}
                     <div class="text-secondary text-center py-4">暂无待执行体能训练项目。</div>
@@ -38,9 +45,16 @@
             <div class="card-body">
                 {% for item in running_items %}
                     <div class="border rounded-3 p-3 mb-3">
+                        {% if item.source_label %}
+                        <div class="badge text-bg-info mb-2">{{ item.source_label }}</div>
+                        {% endif %}
                         <div class="fw-semibold">{{ item.title }}</div>
                         <div class="small text-secondary">{{ item.plan_title }}</div>
                         <div class="small text-secondary">{{ item.athlete_name }}</div>
+                        <div class="small mt-2">强度：{{ item.intensity or '-' }} / 计划时长：{{ item.planned_minutes or 0 }} 分钟</div>
+                        {% if item.target_description %}
+                        <div class="small text-secondary mt-2">{{ item.target_description }}</div>
+                        {% endif %}
                     </div>
                 {% else %}
                     <div class="text-secondary text-center py-4">暂无执行中的体能训练项目。</div>
@@ -56,9 +70,16 @@
             <div class="card-body">
                 {% for item in completed_items %}
                     <div class="border rounded-3 p-3 mb-3">
+                        {% if item.source_label %}
+                        <div class="badge text-bg-info mb-2">{{ item.source_label }}</div>
+                        {% endif %}
                         <div class="fw-semibold">{{ item.title }}</div>
                         <div class="small text-secondary">{{ item.plan_title }}</div>
                         <div class="small text-secondary">{{ item.athlete_name }}</div>
+                        <div class="small mt-2">强度：{{ item.intensity or '-' }} / 计划时长：{{ item.planned_minutes or 0 }} 分钟</div>
+                        {% if item.target_description %}
+                        <div class="small text-secondary mt-2">{{ item.target_description }}</div>
+                        {% endif %}
                     </div>
                 {% else %}
                     <div class="text-secondary text-center py-4">暂无已完成体能训练项目。</div>

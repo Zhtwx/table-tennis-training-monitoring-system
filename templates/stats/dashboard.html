@@ -6,9 +6,9 @@
         <h1 class="h3 mb-0 text-gray-800">数据统计看板</h1>
     </div>
 
-    <!-- 顶部统计卡片 -->
+    <!-- 顶部统计卡片（6个） -->
     <div class="row">
-        <div class="col-xl-3 col-md-6 mb-4">
+        <div class="col-xl-2 col-md-4 mb-4">
             <div class="card border-left-primary shadow h-100 py-2">
                 <div class="card-body">
                     <div class="row no-gutters align-items-center">
@@ -20,7 +20,7 @@
                 </div>
             </div>
         </div>
-        <div class="col-xl-3 col-md-6 mb-4">
+        <div class="col-xl-2 col-md-4 mb-4">
             <div class="card border-left-success shadow h-100 py-2">
                 <div class="card-body">
                     <div class="row no-gutters align-items-center">
@@ -32,7 +32,7 @@
                 </div>
             </div>
         </div>
-        <div class="col-xl-3 col-md-6 mb-4">
+        <div class="col-xl-2 col-md-4 mb-4">
             <div class="card border-left-warning shadow h-100 py-2">
                 <div class="card-body">
                     <div class="row no-gutters align-items-center">
@@ -44,13 +44,37 @@
                 </div>
             </div>
         </div>
-        <div class="col-xl-3 col-md-6 mb-4">
+        <div class="col-xl-2 col-md-4 mb-4">
             <div class="card border-left-info shadow h-100 py-2">
                 <div class="card-body">
                     <div class="row no-gutters align-items-center">
                         <div class="col mr-2">
                             <div class="text-xs font-weight-bold text-info text-uppercase mb-1">平均体能综合得分</div>
                             <div class="h5 mb-0 font-weight-bold text-gray-800">{{ stats.cards.avg_fitness }} 分</div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+        <div class="col-xl-2 col-md-4 mb-4">
+            <div class="card border-left-secondary shadow h-100 py-2">
+                <div class="card-body">
+                    <div class="row no-gutters align-items-center">
+                        <div class="col mr-2">
+                            <div class="text-xs font-weight-bold text-secondary text-uppercase mb-1">平均技战术得分</div>
+                            <div class="h5 mb-0 font-weight-bold text-gray-800">{{ stats.cards.avg_tech }} 分</div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+        <div class="col-xl-2 col-md-4 mb-4">
+            <div class="card border-left-dark shadow h-100 py-2">
+                <div class="card-body">
+                    <div class="row no-gutters align-items-center">
+                        <div class="col mr-2">
+                            <div class="text-xs font-weight-bold text-dark text-uppercase mb-1">平均步法得分</div>
+                            <div class="h5 mb-0 font-weight-bold text-gray-800">{{ stats.cards.avg_footwork }} 分</div>
                         </div>
                     </div>
                 </div>
@@ -82,15 +106,39 @@
         </div>
     </div>
 
-    <!-- 图表第二行：体能排名 + 强度占比 -->
+    <!-- 图表第二行：体能五项对比 + 综合能力雷达图 -->
+    <div class="row">
+        <div class="col-xl-7 col-lg-7">
+            <div class="card shadow mb-4">
+                <div class="card-header py-3">
+                    <h6 class="m-0 font-weight-bold text-primary">运动员体能指标对比（最新测试）</h6>
+                </div>
+                <div class="card-body">
+                    <div id="fitnessDetailChart" style="height: 370px;"></div>
+                </div>
+            </div>
+        </div>
+        <div class="col-xl-5 col-lg-5">
+            <div class="card shadow mb-4">
+                <div class="card-header py-3">
+                    <h6 class="m-0 font-weight-bold text-primary">综合能力雷达图</h6>
+                </div>
+                <div class="card-body">
+                    <div id="radarChart" style="height: 420px;"></div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- 图表第三行：步法趋势 + 训练强度占比 -->
     <div class="row">
         <div class="col-xl-6 col-lg-6">
             <div class="card shadow mb-4">
                 <div class="card-header py-3">
-                    <h6 class="m-0 font-weight-bold text-primary">运动员体能得分排名</h6>
+                    <h6 class="m-0 font-weight-bold text-primary">月度步法训练平均时长趋势</h6>
                 </div>
                 <div class="card-body">
-                    <div id="fitnessRankChart" style="height: 320px;"></div>
+                    <div id="footworkTrendChart" style="height: 355px;"></div>
                 </div>
             </div>
         </div>
@@ -100,36 +148,35 @@
                     <h6 class="m-0 font-weight-bold text-primary">训练强度占比</h6>
                 </div>
                 <div class="card-body">
-                    <div id="intensityPieChart" style="height: 320px;"></div>
+                    <div id="intensityPieChart" style="height: 345px;"></div>
                 </div>
             </div>
         </div>
     </div>
 
-    <!-- 图表第三行：专项技术得分趋势 -->
+    <!-- 图表第四行：技战术月度趋势 -->
     <div class="row">
         <div class="col-xl-12 col-lg-12">
             <div class="card shadow mb-4">
                 <div class="card-header py-3">
-                    <h6 class="m-0 font-weight-bold text-primary">月度专项技术平均得分趋势</h6>
+                    <h6 class="m-0 font-weight-bold text-primary">月度技战术平均得分趋势</h6>
                 </div>
                 <div class="card-body">
-                    <div id="skillTrendChart" style="height: 320px;"></div>
+                    <div id="skillTrendChart" style="height: 315px;"></div>
                 </div>
             </div>
         </div>
     </div>
 </div>
 
-<!-- 统计数据JSON容器：分离模板语法与JS代码，消除编辑器报错 -->
+<!-- 统计数据JSON容器 -->
 <script type="application/json" id="statsData">
 {{ stats|tojson }}
 </script>
 
-<!-- 引入ECharts可视化库 -->
+<!-- 引入ECharts -->
 <script src="https://cdn.jsdelivr.net/npm/echarts@5.4.3/dist/echarts.min.js"></script>
 <script>
-// 读取统计数据
 const stats = JSON.parse(document.getElementById('statsData').textContent);
 
 // 1. 月度训练趋势图
@@ -138,14 +185,14 @@ trainTrendChart.setOption({
     tooltip: { trigger: 'axis' },
     legend: { data: ['训练时长(分钟)', '训练次数'] },
     grid: { left: '3%', right: '4%', bottom: '3%', containLabel: true },
-    xAxis: { type: 'category', boundaryGap: false, data: stats.month_labels },
+    xAxis: { type: 'category', boundaryGap: false, data: stats.month_labels || [] },
     yAxis: [
         { type: 'value', name: '时长(分钟)' },
         { type: 'value', name: '次数' }
     ],
     series: [
-        { name: '训练时长(分钟)', type: 'line', smooth: true, data: stats.monthly_duration, itemStyle: { color: '#4e73df' } },
-        { name: '训练次数', type: 'line', yAxisIndex: 1, smooth: true, data: stats.monthly_train_count, itemStyle: { color: '#1cc88a' } }
+        { name: '训练时长(分钟)', type: 'line', smooth: true, data: stats.monthly_duration || [], itemStyle: { color: '#4e73df' } },
+        { name: '训练次数', type: 'line', yAxisIndex: 1, smooth: true, data: stats.monthly_train_count || [], itemStyle: { color: '#1cc88a' } }
     ]
 });
 
@@ -159,30 +206,83 @@ injuryPieChart.setOption({
         type: 'pie',
         radius: ['40%', '70%'],
         itemStyle: { borderRadius: 10, borderColor: '#fff', borderWidth: 2 },
-        label: { show: false, position: 'center' },
+        label: { show: false },
         emphasis: { label: { show: true, fontSize: 16, fontWeight: 'bold' } },
         labelLine: { show: false },
-        data: stats.injury_pie
+        data: stats.injury_pie || []
     }]
 });
 
-// 3. 体能排名柱状图
-const fitnessRankChart = echarts.init(document.getElementById('fitnessRankChart'));
-fitnessRankChart.setOption({
+// 3. 体能五项对比堆叠柱状图
+const fitnessDetailChart = echarts.init(document.getElementById('fitnessDetailChart'));
+fitnessDetailChart.setOption({
     tooltip: { trigger: 'axis', axisPointer: { type: 'shadow' } },
+    legend: { data: ['上肢力量', '下肢力量', '柔韧性', '耐力', '速度'], top: 5 },
     grid: { left: '3%', right: '4%', bottom: '3%', containLabel: true },
-    xAxis: { type: 'category', data: stats.fitness_player_names },
-    yAxis: { type: 'value', min: 0, max: 100, name: '得分' },
+    xAxis: { type: 'category', data: stats.fitness_detail?.names || [] },
+    yAxis: { type: 'value', min: 0, max: 150, name: '得分' },
+    series: [
+        { name: '上肢力量', type: 'bar', stack: 'total', data: stats.fitness_detail?.upper_strength || [], itemStyle: { color: '#4e73df' } },
+        { name: '下肢力量', type: 'bar', stack: 'total', data: stats.fitness_detail?.lower_strength || [], itemStyle: { color: '#1cc88a' } },
+        { name: '柔韧性', type: 'bar', stack: 'total', data: stats.fitness_detail?.flexibility || [], itemStyle: { color: '#36b9cc' } },
+        { name: '耐力', type: 'bar', stack: 'total', data: stats.fitness_detail?.endurance || [], itemStyle: { color: '#f6c23e' } },
+        { name: '速度', type: 'bar', stack: 'total', data: stats.fitness_detail?.speed || [], itemStyle: { color: '#e74a3b' } }
+    ]
+});
+
+// 4. 综合能力雷达图
+const radarChart = echarts.init(document.getElementById('radarChart'));
+// 动态计算最大值
+let maxRadarVal = 100;
+if (stats.radar?.data && stats.radar.data.length > 0) {
+    const flat = stats.radar.data.flat();
+    if (flat.length > 0) maxRadarVal = Math.max(100, ...flat);
+}
+radarChart.setOption({
+    tooltip: {},
+    legend: { data: stats.radar?.names || [], bottom: 0 },
+    radar: {
+        indicator: [
+            { name: '体能综合', max: maxRadarVal },
+            { name: '技战术得分', max: maxRadarVal },
+            { name: '步法训练量', max: maxRadarVal },
+            { name: '速度', max: maxRadarVal },
+            { name: '耐力', max: maxRadarVal }
+        ],
+        shape: 'circle',
+        center: ['50%', '45%'],
+        radius: '65%'
+    },
     series: [{
-        name: '综合体能得分',
-        type: 'bar',
-        data: stats.fitness_player_scores,
-        itemStyle: { color: '#36b9cc' },
-        barWidth: '40%'
+        type: 'radar',
+        data: (stats.radar?.names || []).map((name, idx) => ({
+            value: stats.radar.data[idx] || [0,0,0,0,0],
+            name: name,
+            areaStyle: { opacity: 0.15 },
+            lineStyle: { width: 2 }
+        }))
     }]
 });
 
-// 4. 训练强度饼图
+// 5. 步法训练月度趋势折线图
+const footworkTrendChart = echarts.init(document.getElementById('footworkTrendChart'));
+footworkTrendChart.setOption({
+    tooltip: { trigger: 'axis' },
+    legend: { data: ['平均时长(分钟)'] },
+    grid: { left: '3%', right: '4%', bottom: '3%', containLabel: true },
+    xAxis: { type: 'category', boundaryGap: false, data: stats.footwork_month_labels || [] },
+    yAxis: { type: 'value', name: '分钟', min: 0 },
+    series: [{
+        name: '平均时长(分钟)',
+        type: 'line',
+        smooth: true,
+        data: stats.footwork_month_scores || [],
+        itemStyle: { color: '#e83e8c' },
+        areaStyle: { opacity: 0.2 }
+    }]
+});
+
+// 6. 训练强度占比饼图
 const intensityPieChart = echarts.init(document.getElementById('intensityPieChart'));
 intensityPieChart.setOption({
     tooltip: { trigger: 'item' },
@@ -191,24 +291,24 @@ intensityPieChart.setOption({
         name: '训练计划数',
         type: 'pie',
         radius: '60%',
-        data: stats.intensity_pie,
+        data: stats.intensity_pie || [],
         emphasis: { itemStyle: { shadowBlur: 10, shadowOffsetX: 0, shadowColor: 'rgba(0, 0, 0, 0.5)' } }
     }]
 });
 
-// 5. 专项技术趋势图
+// 7. 技战术月度趋势折线图
 const skillTrendChart = echarts.init(document.getElementById('skillTrendChart'));
 skillTrendChart.setOption({
     tooltip: { trigger: 'axis' },
-    legend: { data: ['平均击球得分'] },
+    legend: { data: ['平均得分'] },
     grid: { left: '3%', right: '4%', bottom: '3%', containLabel: true },
-    xAxis: { type: 'category', boundaryGap: false, data: stats.skill_month_labels },
-    yAxis: { type: 'value', min: 0, max: 100, name: '得分' },
+    xAxis: { type: 'category', boundaryGap: false, data: stats.skill_month_labels || [] },
+    yAxis: { type: 'value', name: '得分', min: 0, max: 100 },
     series: [{
-        name: '平均击球得分',
+        name: '平均得分',
         type: 'line',
         smooth: true,
-        data: stats.skill_month_scores,
+        data: stats.skill_month_scores || [],
         itemStyle: { color: '#f6c23e' },
         areaStyle: { opacity: 0.2 }
     }]
@@ -218,7 +318,9 @@ skillTrendChart.setOption({
 window.addEventListener('resize', () => {
     trainTrendChart.resize();
     injuryPieChart.resize();
-    fitnessRankChart.resize();
+    fitnessDetailChart.resize();
+    radarChart.resize();
+    footworkTrendChart.resize();
     intensityPieChart.resize();
     skillTrendChart.resize();
 });
