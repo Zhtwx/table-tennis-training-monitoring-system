@@ -1,6 +1,9 @@
 -- ============================================================
 -- 成员9：统计分析与 Excel 数据导入导出增量脚本
--- 适配当前仓库 sql/pingpang_db.sql 的表结构。
+-- 依赖脚本（按顺序执行）：
+--   1. sql/pingpang_db.sql
+--   2. sql/member2_advanced_database.sql（为 injury_record 增加 is_deleted）
+--   3. sql/fitness_training_redesign.sql（体能训练新指标记录）
 -- 用法: mysql -u root -p pingpang_db < sql/member9_stats_excel.sql
 -- ============================================================
 
@@ -16,14 +19,10 @@ CREATE TABLE IF NOT EXISTS temp_import_technical_record (
     multi_ball_duration INT DEFAULT 0,
     intensity           ENUM('低','中','高','极高') DEFAULT '中',
     import_batch_no     VARCHAR(50) NOT NULL,
-    create_time         TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+    create_time         TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    KEY idx_member9_import_batch (import_batch_no),
+    KEY idx_member9_import_student_date (student_no, record_date)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8;
-
-CREATE INDEX idx_member9_import_batch
-    ON temp_import_technical_record(import_batch_no);
-
-CREATE INDEX idx_member9_import_student_date
-    ON temp_import_technical_record(student_no, record_date);
 
 -- 按运动员、月份统计训练时长与训练强度。
 DROP VIEW IF EXISTS v_member9_monthly_training_stats;
@@ -105,6 +104,25 @@ SELECT
 FROM athlete a
 JOIN technical_record tr ON tr.athlete_id = a.id
 GROUP BY a.id, a.student_no, a.name, DATE_FORMAT(tr.record_date, '%Y-%m');
+
+-- 新体能训练模块月度统计。旧体测报告仍保留在 fitness_report 中，
+-- 不与新的 0-10 体能训练评分混合计算。
+DROP VIEW IF EXISTS v_member9_fitness_training_monthly_stats;
+
+CREATE VIEW v_member9_fitness_training_monthly_stats AS
+SELECT
+    a.id AS athlete_id,
+    a.student_no,
+    a.name AS athlete_name,
+    DATE_FORMAT(ftr.test_date, '%Y-%m') AS training_month,
+    COUNT(ftr.id) AS record_count,
+    ROUND(AVG(ftr.overall_score), 2) AS avg_overall_score,
+    ROUND(AVG(ftr.sprint_30m), 2) AS avg_sprint_30m,
+    ROUND(AVG(ftr.standing_long_jump), 2) AS avg_standing_long_jump,
+    SUM(ftr.training_hours) AS total_training_hours
+FROM fitness_training_record ftr
+JOIN athlete a ON a.id = ftr.athlete_id
+GROUP BY a.id, a.student_no, a.name, DATE_FORMAT(ftr.test_date, '%Y-%m');
 
 DROP PROCEDURE IF EXISTS sp_member9_import_technical_records;
 DROP PROCEDURE IF EXISTS sp_member9_export_monthly_full_data;
@@ -230,7 +248,31 @@ BEGIN
     JOIN athlete a ON a.id = fr.athlete_id
     WHERE DATE_FORMAT(fr.test_date, '%Y-%m') = p_month
     ORDER BY a.student_no, fr.test_date;
+
+    SELECT
+        a.student_no,
+        a.name AS athlete_name,
+        c.name AS coach_name,
+        ftr.test_date,
+        ftr.plan_name,
+        ftr.training_hours,
+        ftr.training_intensity,
+        ftr.plan_status,
+        ftr.sprint_30m,
+        ftr.abdominal_endurance,
+        ftr.back_endurance,
+        ftr.lateral_slide,
+        ftr.a_footwork,
+        ftr.double_under,
+        ftr.seated_rotation_throw,
+        ftr.standing_long_jump,
+        ftr.overall_score,
+        ftr.notes
+    FROM fitness_training_record ftr
+    JOIN athlete a ON a.id = ftr.athlete_id
+    JOIN coach c ON c.id = ftr.tester_id
+    WHERE DATE_FORMAT(ftr.test_date, '%Y-%m') = p_month
+    ORDER BY a.student_no, ftr.test_date;
 END$$
 
 DELIMITER ;
-
